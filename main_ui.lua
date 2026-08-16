@@ -1,4 +1,4 @@
--- main_ui.lua - ВСЕ КНОПКИ ESP
+-- main_ui.lua - ВСЕ ВКЛАДКИ + ВСЕ КНОПКИ ESP
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
@@ -366,12 +366,15 @@ local function createToggle(parent, labelText, optionName)
 end
 
 -- ============================================
---   СОЗДАНИЕ ВКЛАДОК
+--   СОЗДАНИЕ ВСЕХ ВКЛАДОК
 -- ============================================
 createTab("Visual", "👁️")
 createTab("Movement", "🚀")
+createTab("Modification", "🛠️")
 createTab("Combat", "🔪")
-createTab("Settings", "⚙")
+createTab("Player", "👤")
+createTab("Misc", "⚙")
+createTab("Settings", "🔧")
 
 -- ============================================
 --   НАПОЛНЕНИЕ ВКЛАДКИ VISUAL (ВСЕ КНОПКИ ESP)
@@ -379,7 +382,7 @@ createTab("Settings", "⚙")
 local visualTab = tabs["Visual"]
 visualTab.Visible = true
 
--- Заголовок
+-- Заголовок ESP
 local sectionLabel = Instance.new("TextLabel")
 sectionLabel.Size = UDim2.new(1, 0, 0, 25)
 sectionLabel.BackgroundTransparency = 1
@@ -416,7 +419,7 @@ miscSpacing.Size = UDim2.new(1, 0, 0, 10)
 miscSpacing.BackgroundTransparency = 1
 miscSpacing.Parent = visualTab
 
--- Вторая секция (Misc)
+-- Заголовок Misc
 local sectionLabel2 = Instance.new("TextLabel")
 sectionLabel2.Size = UDim2.new(1, 0, 0, 25)
 sectionLabel2.BackgroundTransparency = 1
@@ -433,6 +436,81 @@ miscSpacing2.BackgroundTransparency = 1
 miscSpacing2.Parent = visualTab
 
 createToggle(visualTab, "Full Bright", "FullBright")
+
+-- ============================================
+--   ДРУГИЕ ВКЛАДКИ (ПУСТЫЕ, ДЛЯ БУДУЩИХ ФУНКЦИЙ)
+-- ============================================
+-- Movement
+local movementTab = tabs["Movement"]
+local movLabel = Instance.new("TextLabel")
+movLabel.Size = UDim2.new(1, 0, 0, 30)
+movLabel.BackgroundTransparency = 1
+movLabel.Text = "🚀 Movement options coming soon..."
+movLabel.TextColor3 = COLORS.TextDim
+movLabel.TextSize = 14
+movLabel.Font = Enum.Font.Gotham
+movLabel.TextXAlignment = Enum.TextXAlignment.Center
+movLabel.Parent = movementTab
+
+-- Modification
+local modTab = tabs["Modification"]
+local modLabel = Instance.new("TextLabel")
+modLabel.Size = UDim2.new(1, 0, 0, 30)
+modLabel.BackgroundTransparency = 1
+modLabel.Text = "🛠️ Modification options coming soon..."
+modLabel.TextColor3 = COLORS.TextDim
+modLabel.TextSize = 14
+modLabel.Font = Enum.Font.Gotham
+modLabel.TextXAlignment = Enum.TextXAlignment.Center
+modLabel.Parent = modTab
+
+-- Combat
+local combatTab = tabs["Combat"]
+local combatLabel = Instance.new("TextLabel")
+combatLabel.Size = UDim2.new(1, 0, 0, 30)
+combatLabel.BackgroundTransparency = 1
+combatLabel.Text = "🔪 Combat options coming soon..."
+combatLabel.TextColor3 = COLORS.TextDim
+combatLabel.TextSize = 14
+combatLabel.Font = Enum.Font.Gotham
+combatLabel.TextXAlignment = Enum.TextXAlignment.Center
+combatLabel.Parent = combatTab
+
+-- Player
+local playerTab = tabs["Player"]
+local playerLabel = Instance.new("TextLabel")
+playerLabel.Size = UDim2.new(1, 0, 0, 30)
+playerLabel.BackgroundTransparency = 1
+playerLabel.Text = "👤 Player options coming soon..."
+playerLabel.TextColor3 = COLORS.TextDim
+playerLabel.TextSize = 14
+playerLabel.Font = Enum.Font.Gotham
+playerLabel.TextXAlignment = Enum.TextXAlignment.Center
+playerLabel.Parent = playerTab
+
+-- Misc
+local miscTab = tabs["Misc"]
+local miscLabel = Instance.new("TextLabel")
+miscLabel.Size = UDim2.new(1, 0, 0, 30)
+miscLabel.BackgroundTransparency = 1
+miscLabel.Text = "⚙ Misc options coming soon..."
+miscLabel.TextColor3 = COLORS.TextDim
+miscLabel.TextSize = 14
+miscLabel.Font = Enum.Font.Gotham
+miscLabel.TextXAlignment = Enum.TextXAlignment.Center
+miscLabel.Parent = miscTab
+
+-- Settings
+local settingsTab = tabs["Settings"]
+local settingsLabel = Instance.new("TextLabel")
+settingsLabel.Size = UDim2.new(1, 0, 0, 30)
+settingsLabel.BackgroundTransparency = 1
+settingsLabel.Text = "🔧 Settings options coming soon..."
+settingsLabel.TextColor3 = COLORS.TextDim
+settingsLabel.TextSize = 14
+settingsLabel.Font = Enum.Font.Gotham
+settingsLabel.TextXAlignment = Enum.TextXAlignment.Center
+settingsLabel.Parent = settingsTab
 
 -- ============================================
 --   АКТИВАЦИЯ ПЕРВОЙ ВКЛАДКИ
