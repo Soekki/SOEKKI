@@ -1,27 +1,36 @@
--- ViolenceDistrict.lua - Главный файл загрузки
+-- ViolenceDistrict.lua - ГЛАВНЫЙ ФАЙЛ
 print("[SOEKKI] Loading Violence District...")
 
-local success, result = pcall(function()
-    -- Загружаем функции ESP
-    local functions = loadstring(game:HttpGet("https://raw.githubusercontent.com/Soekki/ViolenceDistrict/refs/heads/main/main_functions.lua"))()
-    if not functions then
-        error("Failed to load main_functions.lua")
+local function loadModule(url)
+    print("[SOEKKI] Loading: " .. url)
+    local success, result = pcall(function()
+        return game:HttpGet(url)
+    end)
+    if not success then
+        error("Failed to load: " .. url .. "\nError: " .. tostring(result))
     end
-    
-    -- Загружаем UI
-    local ui = loadstring(game:HttpGet("https://raw.githubusercontent.com/Soekki/ViolenceDistrict/refs/heads/main/main_ui.lua"))()
-    if not ui then
-        error("Failed to load main_ui.lua")
-    end
-    
-    print("[SOEKKI] All modules loaded successfully!")
-end)
-
-if not success then
-    warn("[SOEKKI] Error loading: " .. tostring(result))
+    return result
 end
 
-return {
-    Loaded = success,
-    Error = result
-}
+-- ВАЖНО: ссылки на ТВОЙ репозиторий SOEKKI
+local BASE_URL = "https://raw.githubusercontent.com/Soekki/SOEKKI/refs/heads/main/"
+
+-- Загружаем функции
+local functionsCode = loadModule(BASE_URL .. "main_functions.lua")
+local func, funcErr = loadstring(functionsCode)
+if not func then
+    error("Compile error in main_functions: " .. tostring(funcErr))
+end
+func()
+print("[SOEKKI] ✅ main_functions loaded!")
+
+-- Загружаем UI
+local uiCode = loadModule(BASE_URL .. "main_ui.lua")
+local ui, uiErr = loadstring(uiCode)
+if not ui then
+    error("Compile error in main_ui: " .. tostring(uiErr))
+end
+ui()
+print("[SOEKKI] ✅ main_ui loaded!")
+
+print("[SOEKKI] 🚀 ALL LOADED! Press RightShift to toggle menu.")
