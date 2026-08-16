@@ -1,8 +1,6 @@
--- main_functions.lua - ПОЛНАЯ ВЕРСИЯ
+-- main_functions.lua - БЕЗ АВТОСКИЛЛЧЕКА
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer
@@ -19,7 +17,6 @@ local ESPConfig = {
     ShowHooks = true,
     ShowPlayers = true,
     ShowKillerWarning = true,
-    AutoSkillCheck = true,
     FullBright = true,
 }
 
@@ -63,11 +60,6 @@ local MaskColors = {
 local ActiveGenerators = {}
 local LastUpdateTick = 0
 local LastFullESPRefresh = 0
-
-local TouchID = 8822
-local ActionPath = "Survivor-mob.Controls.action.check"
-local HeartbeatConnection = nil
-local VisibilityConnection = nil
 local IndicatorGui = nil
 
 -- ============================================
@@ -415,67 +407,6 @@ local function RefreshESP()
 end
 
 -- ============================================
---   AUTO SKILL CHECK
--- ============================================
-local function GetActionTarget()
-    local current = PlayerGui
-    for segment in string.gmatch(ActionPath, "[^%.]+") do
-        current = current and current:FindFirstChild(segment)
-    end
-    return current
-end
-
-local function TriggerMobileButton()
-    local b = GetActionTarget()
-    if b and b:IsA("GuiObject") then
-        local p, s, i = b.AbsolutePosition, b.AbsoluteSize, GuiService:GetGuiInset()
-        local cx, cy = p.X + (s.X/2) + i.X, p.Y + (s.Y/2) + i.Y
-        pcall(function()
-            VirtualInputManager:SendTouchEvent(TouchID, 0, cx, cy)
-            task.wait(0.01)
-            VirtualInputManager:SendTouchEvent(TouchID, 2, cx, cy)
-        end)
-    end
-end
-
-local function InitializeAutobuy()
-    task.spawn(function()
-        local prompt = PlayerGui:WaitForChild("SkillCheckPromptGui", 10)
-        local check = prompt and prompt:WaitForChild("Check", 10)
-        if not check then return end
-        local line, goal = check:WaitForChild("Line"), check:WaitForChild("Goal")
-        if VisibilityConnection then VisibilityConnection:Disconnect() end
-        VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()
-            if not ESPConfig.AutoSkillCheck then
-                if HeartbeatConnection then
-                    HeartbeatConnection:Disconnect()
-                    HeartbeatConnection = nil
-                end
-                return
-            end
-            
-            if LocalPlayer.Team and LocalPlayer.Team.Name == "Survivors" and check.Visible then
-                if HeartbeatConnection then HeartbeatConnection:Disconnect() end
-                HeartbeatConnection = RunService.Heartbeat:Connect(function()
-                    local lr, gr = line.Rotation % 360, goal.Rotation % 360
-                    local ss, se = (gr + 101) % 360, (gr + 115) % 360
-                    if (ss > se and (lr >= ss or lr <= se)) or (lr >= ss and lr <= se) then
-                        TriggerMobileButton()
-                        if HeartbeatConnection then
-                            HeartbeatConnection:Disconnect()
-                            HeartbeatConnection = nil
-                        end
-                    end
-                end)
-            elseif HeartbeatConnection then
-                HeartbeatConnection:Disconnect()
-                HeartbeatConnection = nil
-            end
-        end)
-    end)
-end
-
--- ============================================
 --   ЭКСПОРТ ФУНКЦИЙ
 -- ============================================
 local module = {}
@@ -507,11 +438,8 @@ workspace.ChildAdded:Connect(function(c)
 end)
 
 LocalPlayer.CharacterAdded:Connect(function()
-    if HeartbeatConnection then HeartbeatConnection:Disconnect() end
-    if VisibilityConnection then VisibilityConnection:Disconnect() end
     SetupGui()
     task.wait(1)
-    InitializeAutobuy()
 end)
 
 RunService.Heartbeat:Connect(function()
@@ -585,7 +513,6 @@ end)
 
 SetupGui()
 RefreshESP()
-InitializeAutobuy()
 
 -- Регистрируем в глобальном пространстве
 _G.ESPModule = module

@@ -12,7 +12,7 @@ local function loadModule(url)
     return result
 end
 
--- ВАЖНО: ссылки на ТВОЙ репозиторий SOEKKI
+-- ТВОЯ ССЫЛКА (репозиторий должен быть ПУБЛИЧНЫМ!)
 local BASE_URL = "https://raw.githubusercontent.com/Soekki/SOEKKI/refs/heads/main/"
 
 -- Загружаем функции
