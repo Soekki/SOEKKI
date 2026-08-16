@@ -1,4 +1,4 @@
--- main_ui.lua - ИСПРАВЛЕННАЯ ВЕРСИЯ (только ESP кнопки)
+-- main_ui.lua - ВСЕ КНОПКИ ESP
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
@@ -288,7 +288,7 @@ local function createTab(name, icon)
 end
 
 -- ============================================
---   СОЗДАНИЕ TOGGLE (исправлен)
+--   СОЗДАНИЕ TOGGLE
 -- ============================================
 local function createToggle(parent, labelText, optionName)
 	local container = Instance.new("Frame")
@@ -348,13 +348,12 @@ local function createToggle(parent, labelText, optionName)
 		local newState = not isOn
 		updateToggle(newState)
 		
-		-- Вызываем функцию из main_functions
 		if _G.ToggleESP then
 			_G.ToggleESP(optionName)
 		end
 	end)
 	
-	-- Загружаем состояние из main_functions
+	-- Загружаем состояние
 	task.wait(0.1)
 	if _G.GetESPState then
 		local state = _G.GetESPState(optionName)
@@ -367,21 +366,20 @@ local function createToggle(parent, labelText, optionName)
 end
 
 -- ============================================
---   СОЗДАНИЕ ВКЛАДОК (только Visual)
+--   СОЗДАНИЕ ВКЛАДОК
 -- ============================================
 createTab("Visual", "👁️")
--- Другие вкладки пока пустые
 createTab("Movement", "🚀")
 createTab("Combat", "🔪")
 createTab("Settings", "⚙")
 
 -- ============================================
---   НАПОЛНЕНИЕ ВКЛАДКИ VISUAL (ТОЛЬКО ESP)
+--   НАПОЛНЕНИЕ ВКЛАДКИ VISUAL (ВСЕ КНОПКИ ESP)
 -- ============================================
 local visualTab = tabs["Visual"]
 visualTab.Visible = true
 
--- Заголовок секции
+-- Заголовок
 local sectionLabel = Instance.new("TextLabel")
 sectionLabel.Size = UDim2.new(1, 0, 0, 25)
 sectionLabel.BackgroundTransparency = 1
@@ -397,7 +395,7 @@ espSpacing.Size = UDim2.new(1, 0, 0, 5)
 espSpacing.BackgroundTransparency = 1
 espSpacing.Parent = visualTab
 
--- КНОПКИ ESP (все, что ты просил)
+-- ВСЕ КНОПКИ ESP
 createToggle(visualTab, "Generators", "ShowGenerators")
 createToggle(visualTab, "Gates", "ShowGates")
 createToggle(visualTab, "Pallets", "ShowPallets")
@@ -417,6 +415,24 @@ local miscSpacing = Instance.new("Frame")
 miscSpacing.Size = UDim2.new(1, 0, 0, 10)
 miscSpacing.BackgroundTransparency = 1
 miscSpacing.Parent = visualTab
+
+-- Вторая секция (Misc)
+local sectionLabel2 = Instance.new("TextLabel")
+sectionLabel2.Size = UDim2.new(1, 0, 0, 25)
+sectionLabel2.BackgroundTransparency = 1
+sectionLabel2.Text = "▶ Misc Settings"
+sectionLabel2.TextColor3 = COLORS.Accent
+sectionLabel2.TextSize = 14
+sectionLabel2.Font = Enum.Font.GothamBold
+sectionLabel2.TextXAlignment = Enum.TextXAlignment.Left
+sectionLabel2.Parent = visualTab
+
+local miscSpacing2 = Instance.new("Frame")
+miscSpacing2.Size = UDim2.new(1, 0, 0, 5)
+miscSpacing2.BackgroundTransparency = 1
+miscSpacing2.Parent = visualTab
+
+createToggle(visualTab, "Full Bright", "FullBright")
 
 -- ============================================
 --   АКТИВАЦИЯ ПЕРВОЙ ВКЛАДКИ

@@ -1,4 +1,4 @@
--- main_functions.lua - БЕЗ АВТОСКИЛЛЧЕКА
+-- main_functions.lua - ПОЛНАЯ ВЕРСИЯ С РАЗДЕЛЬНЫМИ НАСТРОЙКАМИ
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
@@ -7,7 +7,7 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- ============================================
---   НАСТРОЙКИ ESP
+--   НАСТРОЙКИ ESP (КАЖДАЯ ОТДЕЛЬНО)
 -- ============================================
 local ESPConfig = {
     ShowGenerators = true,
@@ -92,8 +92,11 @@ local function GetGameValue(obj, name)
     return nil
 end
 
+-- ============================================
+--   ФУНКЦИЯ ПОДСВЕТКИ (РАБОТАЕТ ОТДЕЛЬНО ОТ PLAYERS)
+-- ============================================
 local function ApplyHighlight(object, color)
-    if not ESPConfig.ShowPlayers then return end
+    -- НЕ проверяем ShowPlayers здесь!
     local h = object:FindFirstChild("H") or Instance.new("Highlight")
     h.Name = "H"
     h.Adornee = object
@@ -103,6 +106,12 @@ local function ApplyHighlight(object, color)
     h.OutlineTransparency = 0.3
     h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     h.Parent = object
+end
+
+-- Удаляем старый ApplyHighlight для объектов (если есть)
+local function RemoveHighlight(object)
+    local h = object:FindFirstChild("H")
+    if h then h:Destroy() end
 end
 
 local function CreateBillboardTag(text, color, size, textSize)
@@ -133,6 +142,8 @@ end
 -- ============================================
 local function updatePlayerNametag(player)
     if not IndicatorGui or not IndicatorGui.Parent then return end
+    
+    -- Если ShowPlayers выключен - удаляем всё
     if not ESPConfig.ShowPlayers then
         local toRemove = {}
         for _, child in ipairs(IndicatorGui:GetChildren()) do
@@ -205,6 +216,7 @@ local function updatePlayerNametag(player)
         end
     end
     
+    -- Подсветка игрока (используем ApplyHighlight, но НЕ проверяем ShowPlayers)
     ApplyHighlight(player.Character, color)
 
     local hasMask = false
@@ -303,8 +315,7 @@ local function updateGeneratorProgress(generator)
     if not ESPConfig.ShowGenerators then
         local billboard = generator:FindFirstChild("GenBitchHook")
         if billboard then billboard:Destroy() end
-        local h = generator:FindFirstChild("H")
-        if h then h:Destroy() end
+        RemoveHighlight(generator)
         return true
     end
     
@@ -314,7 +325,7 @@ local function updateGeneratorProgress(generator)
     local billboard = generator:FindFirstChild("GenBitchHook")
     if percent >= 100 then
         if billboard then billboard:Destroy() end
-        local h = generator:FindFirstChild("H") if h then h:Destroy() end
+        RemoveHighlight(generator)
         return true
     end
     
@@ -334,6 +345,8 @@ local function updateGeneratorProgress(generator)
             lbl.TextColor3 = finalColor
         end
     end
+    -- Подсветка генератора
+    ApplyHighlight(generator, Config.Objects.Generator.Color)
     return false
 end
 
@@ -371,14 +384,23 @@ local function updateNextKillerDisplay()
 end
 
 -- ============================================
---   ОБНОВЛЕНИЕ ESP
+--   ОБНОВЛЕНИЕ ESP (КАЖДАЯ ФУНКЦИЯ ОТДЕЛЬНО)
 -- ============================================
 local function RefreshESP()
     ActiveGenerators = {}
     
+    -- Windows
     if ESPConfig.ShowWindows then
         for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj.Name == "Window" then ApplyHighlight(obj, Config.Objects.Window.Color) end
+            if obj.Name == "Window" then
+                ApplyHighlight(obj, Config.Objects.Window.Color)
+            end
+        end
+    else
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj.Name == "Window" then
+                RemoveHighlight(obj)
+            end
         end
     end
     
@@ -386,22 +408,49 @@ local function RefreshESP()
     if not Map then return end
     
     for _, obj in ipairs(Map:GetDescendants()) do
-        if obj.Name == "Generator" and ESPConfig.ShowGenerators then
-            ApplyHighlight(obj, Config.Objects.Generator.Color)
-            table.insert(ActiveGenerators, obj)
-        elseif obj.Name == "Hook" and ESPConfig.ShowHooks then
-            local m = obj:FindFirstChild("Model")
-            if m then
-                for _, p in ipairs(m:GetDescendants()) do
-                    if p:IsA("MeshPart") then
-                        ApplyHighlight(p, Config.Objects.Hook.Color)
+        -- Generators
+        if obj.Name == "Generator" then
+            if ESPConfig.ShowGenerators then
+                ApplyHighlight(obj, Config.Objects.Generator.Color)
+                table.insert(ActiveGenerators, obj)
+            else
+                RemoveHighlight(obj)
+            end
+        -- Hooks
+        elseif obj.Name == "Hook" then
+            if ESPConfig.ShowHooks then
+                local m = obj:FindFirstChild("Model")
+                if m then
+                    for _, p in ipairs(m:GetDescendants()) do
+                        if p:IsA("MeshPart") then
+                            ApplyHighlight(p, Config.Objects.Hook.Color)
+                        end
+                    end
+                end
+            else
+                local m = obj:FindFirstChild("Model")
+                if m then
+                    for _, p in ipairs(m:GetDescendants()) do
+                        if p:IsA("MeshPart") then
+                            RemoveHighlight(p)
+                        end
                     end
                 end
             end
-        elseif (obj.Name == "Palletwrong" or obj.Name == "Pallet") and ESPConfig.ShowPallets then
-            ApplyHighlight(obj, Config.Objects.Pallet.Color)
-        elseif obj.Name == "Gate" and ESPConfig.ShowGates then
-            ApplyHighlight(obj, Config.Objects.Gate.Color)
+        -- Pallets
+        elseif (obj.Name == "Palletwrong" or obj.Name == "Pallet") then
+            if ESPConfig.ShowPallets then
+                ApplyHighlight(obj, Config.Objects.Pallet.Color)
+            else
+                RemoveHighlight(obj)
+            end
+        -- Gates
+        elseif obj.Name == "Gate" then
+            if ESPConfig.ShowGates then
+                ApplyHighlight(obj, Config.Objects.Gate.Color)
+            else
+                RemoveHighlight(obj)
+            end
         end
     end
 end
