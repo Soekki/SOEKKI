@@ -114,9 +114,9 @@ closeButton.Size = UDim2.new(0, 24, 0, 24)
 closeButton.Position = UDim2.new(1, -32, 0, 5)
 closeButton.BackgroundColor3 = COLORS.Darker
 closeButton.BackgroundTransparency = 0.5
-closeButton.Text = "X"
+closeButton.Text = "✕"
 closeButton.TextColor3 = COLORS.TextDim
-closeButton.TextSize = 12
+closeButton.TextSize = 14
 closeButton.Font = Enum.Font.GothamBold
 closeButton.BorderSizePixel = 0
 closeButton.ZIndex = 1006
@@ -368,7 +368,7 @@ local function createToggle(parent, labelText, optionName)
 end
 
 -- ============================================
---   СОЗДАНИЕ TOGGLE ДЛЯ БАФФА (СО СВОЕЙ ЛОГИКОЙ)
+--   СОЗДАНИЕ TOGGLE ДЛЯ БАФФА
 -- ============================================
 local function createBoostToggle(parent, labelText)
 	local container = Instance.new("Frame")
@@ -446,7 +446,7 @@ local function createBoostToggle(parent, labelText)
 end
 
 -- ============================================
---   СОЗДАНИЕ СЛАЙДЕРА
+--   СОЗДАНИЕ СЛАЙДЕРА (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 -- ============================================
 local function createSlider(parent, labelText, minValue, maxValue, step, getter, setter)
 	local container = Instance.new("Frame")
@@ -475,6 +475,7 @@ local function createSlider(parent, labelText, minValue, maxValue, step, getter,
 	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
 	valueLabel.Parent = container
 	
+	-- Создаем фон слайдера
 	local sliderBg = Instance.new("Frame")
 	sliderBg.Size = UDim2.new(1, 0, 0, 6)
 	sliderBg.Position = UDim2.new(0, 0, 1, -8)
@@ -486,6 +487,7 @@ local function createSlider(parent, labelText, minValue, maxValue, step, getter,
 	sliderBgCorner.CornerRadius = UDim.new(0, 3)
 	sliderBgCorner.Parent = sliderBg
 	
+	-- Создаем заливку
 	local sliderFill = Instance.new("Frame")
 	sliderFill.Size = UDim2.new(0, 0, 1, 0)
 	sliderFill.BackgroundColor3 = COLORS.SliderFill
@@ -496,6 +498,7 @@ local function createSlider(parent, labelText, minValue, maxValue, step, getter,
 	sliderFillCorner.CornerRadius = UDim.new(0, 3)
 	sliderFillCorner.Parent = sliderFill
 	
+	-- Создаем кнопку-ползунок
 	local dragButton = Instance.new("TextButton")
 	dragButton.Size = UDim2.new(0, 16, 0, 16)
 	dragButton.Position = UDim2.new(0, -8, 1, -8)
@@ -503,6 +506,7 @@ local function createSlider(parent, labelText, minValue, maxValue, step, getter,
 	dragButton.BackgroundTransparency = 0
 	dragButton.BorderSizePixel = 0
 	dragButton.Text = ""
+	dragButton.ZIndex = 2
 	dragButton.Parent = container
 	
 	local dragButtonCorner = Instance.new("UICorner")
@@ -511,6 +515,7 @@ local function createSlider(parent, labelText, minValue, maxValue, step, getter,
 	
 	local currentValue = 50
 	local isDragging = false
+	local mouse = player:GetMouse()
 	
 	local function updateSlider(value)
 		currentValue = math.clamp(value, minValue, maxValue)
@@ -529,46 +534,80 @@ local function createSlider(parent, labelText, minValue, maxValue, step, getter,
 		end
 	end
 	
-	local function getSliderPosition(input)
-		local relativeX = input.Position.X - sliderBg.AbsolutePosition.X
+	local function getSliderPosition(inputPos)
+		if not sliderBg or not sliderBg.AbsolutePosition or not sliderBg.AbsoluteSize then
+			return currentValue
+		end
+		
+		local relativeX = inputPos.X - sliderBg.AbsolutePosition.X
 		local width = sliderBg.AbsoluteSize.X
+		
+		if width <= 0 then
+			return currentValue
+		end
+		
 		local percent = math.clamp(relativeX / width, 0, 1)
 		local value = minValue + (maxValue - minValue) * percent
 		return value
 	end
 	
+	-- Обработка клика по фону слайдера
+	sliderBg.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			local value = getSliderPosition(input.Position)
+			updateSlider(value)
+			isDragging = true
+		end
+	end)
+	
+	-- Обработка нажатия на кнопку-ползунок
 	dragButton.MouseButton1Down:Connect(function()
 		isDragging = true
 		dragButton.BackgroundColor3 = COLORS.Text
 	end)
 	
-	UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+	-- Обработка отпускания кнопки мыши
+	local function onMouseUp()
+		if isDragging then
 			isDragging = false
 			dragButton.BackgroundColor3 = COLORS.Accent
 		end
-	end)
+	end
 	
-	sliderBg.MouseButton1Down:Connect(function(input)
-		local value = getSliderPosition(input)
-		updateSlider(value)
-	end)
+	mouse.Button1Up:Connect(onMouseUp)
 	
-	UserInputService.InputChanged:Connect(function(input)
-		if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			local value = getSliderPosition(input)
+	-- Обработка движения мыши
+	local mouseMoveConnection
+	mouseMoveConnection = mouse.Move:Connect(function()
+		if isDragging then
+			local value = getSliderPosition(mouse)
 			updateSlider(value)
 		end
 	end)
 	
+	-- Обработка нажатия на ползунок (альтернативный метод)
+	dragButton.MouseButton1Click:Connect(function()
+		local value = getSliderPosition(mouse)
+		updateSlider(value)
+	end)
+	
 	-- Загружаем начальное значение
-	task.wait(0.1)
+	task.wait(0.2)
 	if getter then
 		local initialValue = getter()
 		if initialValue ~= nil then
 			updateSlider(initialValue)
 		end
 	end
+	
+	-- Очищаем подключения при удалении
+	container.AncestryChanged:Connect(function()
+		if not container.Parent then
+			if mouseMoveConnection then
+				mouseMoveConnection:Disconnect()
+			end
+		end
+	end)
 	
 	return updateSlider
 end
@@ -661,7 +700,7 @@ miscSpacing2.Parent = visualTab
 createToggle(visualTab, "Full Bright", "FullBright")
 
 -- ============================================
---   НАПОЛНЕНИЕ ВКЛАДКИ MODIFICATION (С БАФФОМ)
+--   НАПОЛНЕНИЕ ВКЛАДКИ MODIFICATION
 -- ============================================
 local modTab = tabs["Modification"]
 
@@ -718,7 +757,7 @@ local boostSlider = createSlider(
 local boostInfoLabel = Instance.new("TextLabel")
 boostInfoLabel.Size = UDim2.new(1, 0, 0, 20)
 boostInfoLabel.BackgroundTransparency = 1
-boostInfoLabel.Text = "0% = no boost, 100% = 2x speed"
+boostInfoLabel.Text = "0% = no boost | 50% = 1.5x | 100% = 2x speed"
 boostInfoLabel.TextColor3 = COLORS.TextDim
 boostInfoLabel.TextSize = 10
 boostInfoLabel.Font = Enum.Font.Gotham
