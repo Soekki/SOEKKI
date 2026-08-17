@@ -16,8 +16,7 @@ local COLORS = {
 	ToggleOn = Color3.fromRGB(120, 80, 200),
 	TabActive = Color3.fromRGB(40, 40, 50),
 	TabInactive = Color3.fromRGB(25, 25, 32),
-	SliderBg = Color3.fromRGB(35, 35, 45),
-	SliderFill = Color3.fromRGB(120, 80, 200),
+	InputBg = Color3.fromRGB(35, 35, 45),
 }
 
 -- ============================================
@@ -446,16 +445,16 @@ local function createBoostToggle(parent, labelText)
 end
 
 -- ============================================
---   СОЗДАНИЕ СЛАЙДЕРА (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+--   СОЗДАНИЕ ПОЛЯ ВВОДА
 -- ============================================
-local function createSlider(parent, labelText, minValue, maxValue, step, getter, setter)
+local function createInput(parent, labelText, getter, setter)
 	local container = Instance.new("Frame")
-	container.Size = UDim2.new(1, 0, 0, 55)
+	container.Size = UDim2.new(1, 0, 0, 40)
 	container.BackgroundTransparency = 1
 	container.Parent = parent
 	
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -80, 0, 20)
+	label.Size = UDim2.new(1, -100, 0, 20)
 	label.BackgroundTransparency = 1
 	label.Text = labelText
 	label.TextColor3 = COLORS.Text
@@ -464,152 +463,84 @@ local function createSlider(parent, labelText, minValue, maxValue, step, getter,
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = container
 	
-	local valueLabel = Instance.new("TextLabel")
-	valueLabel.Size = UDim2.new(0, 60, 0, 20)
-	valueLabel.Position = UDim2.new(1, -60, 0, 0)
-	valueLabel.BackgroundTransparency = 1
-	valueLabel.Text = "0%"
-	valueLabel.TextColor3 = COLORS.Accent
-	valueLabel.TextSize = 13
-	valueLabel.Font = Enum.Font.GothamBold
-	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-	valueLabel.Parent = container
+	local inputBox = Instance.new("TextBox")
+	inputBox.Size = UDim2.new(0, 80, 0, 28)
+	inputBox.Position = UDim2.new(1, -80, 0, 0)
+	inputBox.BackgroundColor3 = COLORS.InputBg
+	inputBox.BorderSizePixel = 0
+	inputBox.Text = "50"
+	inputBox.TextColor3 = COLORS.Text
+	inputBox.TextSize = 13
+	inputBox.Font = Enum.Font.GothamBold
+	inputBox.TextXAlignment = Enum.TextXAlignment.Center
+	inputBox.PlaceholderText = "0-100"
+	inputBox.Parent = container
 	
-	-- Создаем фон слайдера
-	local sliderBg = Instance.new("Frame")
-	sliderBg.Size = UDim2.new(1, 0, 0, 6)
-	sliderBg.Position = UDim2.new(0, 0, 1, -8)
-	sliderBg.BackgroundColor3 = COLORS.SliderBg
-	sliderBg.BorderSizePixel = 0
-	sliderBg.Parent = container
+	local inputCorner = Instance.new("UICorner")
+	inputCorner.CornerRadius = UDim.new(0, 6)
+	inputCorner.Parent = inputBox
 	
-	local sliderBgCorner = Instance.new("UICorner")
-	sliderBgCorner.CornerRadius = UDim.new(0, 3)
-	sliderBgCorner.Parent = sliderBg
-	
-	-- Создаем заливку
-	local sliderFill = Instance.new("Frame")
-	sliderFill.Size = UDim2.new(0, 0, 1, 0)
-	sliderFill.BackgroundColor3 = COLORS.SliderFill
-	sliderFill.BorderSizePixel = 0
-	sliderFill.Parent = sliderBg
-	
-	local sliderFillCorner = Instance.new("UICorner")
-	sliderFillCorner.CornerRadius = UDim.new(0, 3)
-	sliderFillCorner.Parent = sliderFill
-	
-	-- Создаем кнопку-ползунок
-	local dragButton = Instance.new("TextButton")
-	dragButton.Size = UDim2.new(0, 16, 0, 16)
-	dragButton.Position = UDim2.new(0, -8, 1, -8)
-	dragButton.BackgroundColor3 = COLORS.Accent
-	dragButton.BackgroundTransparency = 0
-	dragButton.BorderSizePixel = 0
-	dragButton.Text = ""
-	dragButton.ZIndex = 2
-	dragButton.Parent = container
-	
-	local dragButtonCorner = Instance.new("UICorner")
-	dragButtonCorner.CornerRadius = UDim.new(0, 8)
-	dragButtonCorner.Parent = dragButton
-	
-	local currentValue = 50
-	local isDragging = false
-	local mouse = player:GetMouse()
-	
-	local function updateSlider(value)
-		currentValue = math.clamp(value, minValue, maxValue)
-		if step then
-			currentValue = math.floor(currentValue / step + 0.5) * step
-		end
-		currentValue = math.clamp(currentValue, minValue, maxValue)
-		
-		local percent = (currentValue - minValue) / (maxValue - minValue)
-		sliderFill.Size = UDim2.new(percent, 0, 1, 0)
-		dragButton.Position = UDim2.new(percent, -8, 1, -8)
-		valueLabel.Text = math.floor(currentValue) .. "%"
-		
-		if setter then
-			setter(currentValue)
-		end
-	end
-	
-	local function getSliderPosition(inputPos)
-		if not sliderBg or not sliderBg.AbsolutePosition or not sliderBg.AbsoluteSize then
-			return currentValue
-		end
-		
-		local relativeX = inputPos.X - sliderBg.AbsolutePosition.X
-		local width = sliderBg.AbsoluteSize.X
-		
-		if width <= 0 then
-			return currentValue
-		end
-		
-		local percent = math.clamp(relativeX / width, 0, 1)
-		local value = minValue + (maxValue - minValue) * percent
-		return value
-	end
-	
-	-- Обработка клика по фону слайдера
-	sliderBg.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			local value = getSliderPosition(input.Position)
-			updateSlider(value)
-			isDragging = true
-		end
-	end)
-	
-	-- Обработка нажатия на кнопку-ползунок
-	dragButton.MouseButton1Down:Connect(function()
-		isDragging = true
-		dragButton.BackgroundColor3 = COLORS.Text
-	end)
-	
-	-- Обработка отпускания кнопки мыши
-	local function onMouseUp()
-		if isDragging then
-			isDragging = false
-			dragButton.BackgroundColor3 = COLORS.Accent
-		end
-	end
-	
-	mouse.Button1Up:Connect(onMouseUp)
-	
-	-- Обработка движения мыши
-	local mouseMoveConnection
-	mouseMoveConnection = mouse.Move:Connect(function()
-		if isDragging then
-			local value = getSliderPosition(mouse)
-			updateSlider(value)
-		end
-	end)
-	
-	-- Обработка нажатия на ползунок (альтернативный метод)
-	dragButton.MouseButton1Click:Connect(function()
-		local value = getSliderPosition(mouse)
-		updateSlider(value)
-	end)
+	local suffixLabel = Instance.new("TextLabel")
+	suffixLabel.Size = UDim2.new(0, 15, 0, 20)
+	suffixLabel.Position = UDim2.new(1, 0, 0, 0)
+	suffixLabel.BackgroundTransparency = 1
+	suffixLabel.Text = "%"
+	suffixLabel.TextColor3 = COLORS.Accent
+	suffixLabel.TextSize = 13
+	suffixLabel.Font = Enum.Font.GothamBold
+	suffixLabel.TextXAlignment = Enum.TextXAlignment.Left
+	suffixLabel.Parent = container
 	
 	-- Загружаем начальное значение
-	task.wait(0.2)
+	task.wait(0.1)
 	if getter then
 		local initialValue = getter()
 		if initialValue ~= nil then
-			updateSlider(initialValue)
+			inputBox.Text = tostring(math.floor(initialValue))
 		end
 	end
 	
-	-- Очищаем подключения при удалении
-	container.AncestryChanged:Connect(function()
-		if not container.Parent then
-			if mouseMoveConnection then
-				mouseMoveConnection:Disconnect()
+	inputBox.FocusLost:Connect(function(enterPressed)
+		local num = tonumber(inputBox.Text)
+		if num then
+			num = math.clamp(math.floor(num), 0, 100)
+			inputBox.Text = tostring(num)
+			if setter then
+				setter(num)
+			end
+		else
+			-- Если введено не число, возвращаем последнее валидное значение
+			if getter then
+				local currentValue = getter()
+				if currentValue ~= nil then
+					inputBox.Text = tostring(math.floor(currentValue))
+				else
+					inputBox.Text = "50"
+				end
 			end
 		end
 	end)
 	
-	return updateSlider
+	-- Обновляем значение при изменении через другие методы
+	local updateConnection
+	updateConnection = game:GetService("RunService").Heartbeat:Connect(function()
+		if not container.Parent then
+			if updateConnection then updateConnection:Disconnect() end
+			return
+		end
+		
+		if getter then
+			local currentValue = getter()
+			if currentValue ~= nil then
+				local currentText = tonumber(inputBox.Text)
+				if currentText ~= currentValue then
+					inputBox.Text = tostring(math.floor(currentValue))
+				end
+			end
+		end
+	end)
+	
+	return inputBox
 end
 
 -- ============================================
@@ -745,11 +676,10 @@ boostSpacing2.Size = UDim2.new(1, 0, 0, 5)
 boostSpacing2.BackgroundTransparency = 1
 boostSpacing2.Parent = modTab
 
--- Слайдер для настройки процента баффа
-local boostSlider = createSlider(
+-- Поле ввода для процента баффа
+local boostInput = createInput(
 	modTab,
 	"Boost Speed",
-	0, 100, 1,
 	_G.GetGeneratorBoostPercent,
 	_G.SetGeneratorBoostPercent
 )
