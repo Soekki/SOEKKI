@@ -37,6 +37,16 @@ local Config = {
     }
 }
 
+-- Сохраняем исходное освещение, чтобы Full Bright можно было корректно выключить.
+local OriginalLighting = {
+    Ambient = Lighting.Ambient,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    GlobalShadows = Lighting.GlobalShadows,
+    FogEnd = Lighting.FogEnd,
+}
+
 local MaskNames = {
     ["Richard"] = "Rooster",
     ["Tony"] = "Tiger",
@@ -461,9 +471,11 @@ end
 local module = {}
 
 function module.ToggleESP(option)
-    ESPConfig[option] = not ESPConfig[option]
-    RefreshESP()
-    return ESPConfig[option]
+    if ESPConfig[option] == nil then
+        return nil
+    end
+
+    return module.SetESPState(option, not ESPConfig[option])
 end
 
 function module.GetESPState(option)
@@ -471,7 +483,11 @@ function module.GetESPState(option)
 end
 
 function module.SetESPState(option, state)
-    ESPConfig[option] = state
+    if ESPConfig[option] == nil then
+        return nil
+    end
+
+    ESPConfig[option] = state == true
     RefreshESP()
     return ESPConfig[option]
 end
@@ -503,6 +519,13 @@ RunService.Heartbeat:Connect(function()
         Lighting.ClockTime = 14
         Lighting.GlobalShadows = false
         Lighting.FogEnd = 9e9
+    else
+        Lighting.Ambient = OriginalLighting.Ambient
+        Lighting.OutdoorAmbient = OriginalLighting.OutdoorAmbient
+        Lighting.Brightness = OriginalLighting.Brightness
+        Lighting.ClockTime = OriginalLighting.ClockTime
+        Lighting.GlobalShadows = OriginalLighting.GlobalShadows
+        Lighting.FogEnd = OriginalLighting.FogEnd
     end
     
     if now - LastFullESPRefresh > 5 then
@@ -527,9 +550,9 @@ RunService.Heartbeat:Connect(function()
         end 
     end
     
-    if myRoot and ESPConfig.ShowKillerWarning then
+    if myRoot then
         local warn = myRoot:FindFirstChild("KillerWarn")
-        if killerNearby then
+        if ESPConfig.ShowKillerWarning and killerNearby then
             if not warn then
                 warn = CreateBillboardTag("!", Color3.fromRGB(255, 0, 0), UDim2.new(0, 50, 0, 50), 40)
                 warn.Name, warn.StudsOffset, warn.Adornee, warn.Parent = "KillerWarn", Vector3.new(0, 4, 0), myRoot, myRoot
@@ -567,6 +590,7 @@ RefreshESP()
 _G.ESPModule = module
 _G.ToggleESP = module.ToggleESP
 _G.GetESPState = module.GetESPState
+_G.SetESPState = module.SetESPState
 
 print("[SOEKKI] Functions loaded!")
 

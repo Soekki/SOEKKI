@@ -290,14 +290,15 @@ end
 -- ============================================
 --   СОЗДАНИЕ TOGGLE
 -- ============================================
-local function createToggle(parent, labelText, optionName)
+local function createToggle(parent, labelText, optionName, layoutOrder)
 	local container = Instance.new("Frame")
-	container.Size = UDim2.new(1, 0, 0, 30)
+	container.Size = UDim2.new(1, 0, 0, 34)
 	container.BackgroundTransparency = 1
+	container.LayoutOrder = layoutOrder or 0
 	container.Parent = parent
 	
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -50, 1, 0)
+	label.Size = UDim2.new(1, -60, 1, 0)
 	label.BackgroundTransparency = 1
 	label.Text = labelText
 	label.TextColor3 = COLORS.Text
@@ -307,10 +308,11 @@ local function createToggle(parent, labelText, optionName)
 	label.Parent = container
 	
 	local toggleBtn = Instance.new("TextButton")
-	toggleBtn.Size = UDim2.new(0, 40, 0, 22)
-	toggleBtn.Position = UDim2.new(1, -45, 0.5, -11)
+	toggleBtn.Size = UDim2.new(0, 42, 0, 22)
+	toggleBtn.Position = UDim2.new(1, -42, 0.5, -11)
 	toggleBtn.BackgroundColor3 = COLORS.ToggleOff
 	toggleBtn.Text = ""
+	toggleBtn.AutoButtonColor = false
 	toggleBtn.BorderSizePixel = 0
 	toggleBtn.Parent = container
 	
@@ -332,10 +334,10 @@ local function createToggle(parent, labelText, optionName)
 	local isOn = false
 	
 	local function updateToggle(state)
-		isOn = state
+		isOn = state == true
 		if isOn then
 			toggleBtn.BackgroundColor3 = COLORS.ToggleOn
-			toggleDot.Position = UDim2.new(0, 21, 0.5, -8)
+			toggleDot.Position = UDim2.new(0, 23, 0.5, -8)
 			toggleDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 		else
 			toggleBtn.BackgroundColor3 = COLORS.ToggleOff
@@ -346,21 +348,26 @@ local function createToggle(parent, labelText, optionName)
 	
 	toggleBtn.MouseButton1Click:Connect(function()
 		local newState = not isOn
-		updateToggle(newState)
-		
-		if _G.ToggleESP then
-			_G.ToggleESP(optionName)
+	
+		-- Передаём именно выбранное состояние, а не просто Toggle().
+		-- Так UI и ESPConfig никогда не расходятся.
+		if _G.SetESPState then
+			local result = _G.SetESPState(optionName, newState)
+			updateToggle(result)
+		else
+			updateToggle(newState)
 		end
 	end)
 	
-	-- Загружаем состояние
-	task.wait(0.1)
-	if _G.GetESPState then
-		local state = _G.GetESPState(optionName)
-		if state ~= nil then
-			updateToggle(state)
+	-- Загружаем реальное состояние из ESPConfig.
+	task.defer(function()
+		if _G.GetESPState then
+			local state = _G.GetESPState(optionName)
+			if state ~= nil then
+				updateToggle(state)
+			end
 		end
-	end
+	end)
 	
 	return updateToggle
 end
@@ -382,60 +389,59 @@ createTab("Settings", "🔧")
 local visualTab = tabs["Visual"]
 visualTab.Visible = true
 
--- Заголовок ESP
-local sectionLabel = Instance.new("TextLabel")
-sectionLabel.Size = UDim2.new(1, 0, 0, 25)
-sectionLabel.BackgroundTransparency = 1
-sectionLabel.Text = "▶ ESP Settings"
-sectionLabel.TextColor3 = COLORS.Accent
-sectionLabel.TextSize = 14
-sectionLabel.Font = Enum.Font.GothamBold
-sectionLabel.TextXAlignment = Enum.TextXAlignment.Left
-sectionLabel.Parent = visualTab
+-- Автоматически раскладываем все элементы Visual вертикально.
+-- Раньше у ScrollingFrame не было Layout, поэтому все Toggle накладывались друг на друга.
+visualTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
+visualTab.CanvasSize = UDim2.new(0, 0, 0, 0)
 
-local espSpacing = Instance.new("Frame")
-espSpacing.Size = UDim2.new(1, 0, 0, 5)
-espSpacing.BackgroundTransparency = 1
-espSpacing.Parent = visualTab
+local visualPadding = Instance.new("UIPadding")
+visualPadding.PaddingTop = UDim.new(0, 8)
+visualPadding.PaddingLeft = UDim.new(0, 8)
+visualPadding.PaddingRight = UDim.new(0, 8)
+visualPadding.PaddingBottom = UDim.new(0, 12)
+visualPadding.Parent = visualTab
 
--- ВСЕ КНОПКИ ESP
-createToggle(visualTab, "Generators", "ShowGenerators")
-createToggle(visualTab, "Gates", "ShowGates")
-createToggle(visualTab, "Pallets", "ShowPallets")
-createToggle(visualTab, "Windows", "ShowWindows")
-createToggle(visualTab, "Hooks", "ShowHooks")
-createToggle(visualTab, "Players", "ShowPlayers")
-createToggle(visualTab, "Killer Warning", "ShowKillerWarning")
+local visualLayout = Instance.new("UIListLayout")
+visualLayout.Padding = UDim.new(0, 6)
+visualLayout.SortOrder = Enum.SortOrder.LayoutOrder
+visualLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+visualLayout.Parent = visualTab
 
--- Разделитель
+local function createSectionTitle(parent, text, layoutOrder)
+    local section = Instance.new("TextLabel")
+    section.Size = UDim2.new(1, 0, 0, 24)
+    section.BackgroundTransparency = 1
+    section.Text = text
+    section.TextColor3 = COLORS.Accent
+    section.TextSize = 14
+    section.Font = Enum.Font.GothamBold
+    section.TextXAlignment = Enum.TextXAlignment.Left
+    section.LayoutOrder = layoutOrder or 0
+    section.Parent = parent
+    return section
+end
+
+createSectionTitle(visualTab, "▶ ESP Settings", 1)
+
+-- Каждый ESP имеет собственный независимый переключатель.
+createToggle(visualTab, "Generators", "ShowGenerators", 10)
+createToggle(visualTab, "Gates", "ShowGates", 11)
+createToggle(visualTab, "Pallets", "ShowPallets", 12)
+createToggle(visualTab, "Windows", "ShowWindows", 13)
+createToggle(visualTab, "Hooks", "ShowHooks", 14)
+createToggle(visualTab, "Players", "ShowPlayers", 15)
+createToggle(visualTab, "Killer Warning", "ShowKillerWarning", 16)
+
 local divider = Instance.new("Frame")
 divider.Size = UDim2.new(1, 0, 0, 1)
 divider.BackgroundColor3 = COLORS.Darker
 divider.BackgroundTransparency = 0.5
+divider.BorderSizePixel = 0
+divider.LayoutOrder = 20
 divider.Parent = visualTab
 
-local miscSpacing = Instance.new("Frame")
-miscSpacing.Size = UDim2.new(1, 0, 0, 10)
-miscSpacing.BackgroundTransparency = 1
-miscSpacing.Parent = visualTab
-
--- Заголовок Misc
-local sectionLabel2 = Instance.new("TextLabel")
-sectionLabel2.Size = UDim2.new(1, 0, 0, 25)
-sectionLabel2.BackgroundTransparency = 1
-sectionLabel2.Text = "▶ Misc Settings"
-sectionLabel2.TextColor3 = COLORS.Accent
-sectionLabel2.TextSize = 14
-sectionLabel2.Font = Enum.Font.GothamBold
-sectionLabel2.TextXAlignment = Enum.TextXAlignment.Left
-sectionLabel2.Parent = visualTab
-
-local miscSpacing2 = Instance.new("Frame")
-miscSpacing2.Size = UDim2.new(1, 0, 0, 5)
-miscSpacing2.BackgroundTransparency = 1
-miscSpacing2.Parent = visualTab
-
-createToggle(visualTab, "Full Bright", "FullBright")
+createSectionTitle(visualTab, "▶ Misc Settings", 21)
+createToggle(visualTab, "Full Bright", "FullBright", 22)
 
 -- ============================================
 --   ДРУГИЕ ВКЛАДКИ (ПУСТЫЕ, ДЛЯ БУДУЩИХ ФУНКЦИЙ)
