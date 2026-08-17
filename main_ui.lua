@@ -1,4 +1,4 @@
--- main_ui.lua - ВСЕ ВКЛАДКИ + ВСЕ КНОПКИ ESP
+-- main_ui.lua - ВСЕ ВКЛАДКИ + ВСЕ КНОПКИ ESP + БАФФ ГЕНЕРАТОРОВ
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
@@ -16,6 +16,8 @@ local COLORS = {
 	ToggleOn = Color3.fromRGB(120, 80, 200),
 	TabActive = Color3.fromRGB(40, 40, 50),
 	TabInactive = Color3.fromRGB(25, 25, 32),
+	SliderBg = Color3.fromRGB(35, 35, 45),
+	SliderFill = Color3.fromRGB(120, 80, 200),
 }
 
 -- ============================================
@@ -366,6 +368,212 @@ local function createToggle(parent, labelText, optionName)
 end
 
 -- ============================================
+--   СОЗДАНИЕ TOGGLE ДЛЯ БАФФА (СО СВОЕЙ ЛОГИКОЙ)
+-- ============================================
+local function createBoostToggle(parent, labelText)
+	local container = Instance.new("Frame")
+	container.Size = UDim2.new(1, 0, 0, 30)
+	container.BackgroundTransparency = 1
+	container.Parent = parent
+	
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, -50, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = labelText
+	label.TextColor3 = COLORS.Text
+	label.TextSize = 13
+	label.Font = Enum.Font.Gotham
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = container
+	
+	local toggleBtn = Instance.new("TextButton")
+	toggleBtn.Size = UDim2.new(0, 40, 0, 22)
+	toggleBtn.Position = UDim2.new(1, -45, 0.5, -11)
+	toggleBtn.BackgroundColor3 = COLORS.ToggleOff
+	toggleBtn.Text = ""
+	toggleBtn.BorderSizePixel = 0
+	toggleBtn.Parent = container
+	
+	local toggleCorner = Instance.new("UICorner")
+	toggleCorner.CornerRadius = UDim.new(0, 11)
+	toggleCorner.Parent = toggleBtn
+	
+	local toggleDot = Instance.new("Frame")
+	toggleDot.Size = UDim2.new(0, 16, 0, 16)
+	toggleDot.Position = UDim2.new(0, 3, 0.5, -8)
+	toggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+	toggleDot.BorderSizePixel = 0
+	toggleDot.Parent = toggleBtn
+	
+	local dotCorner = Instance.new("UICorner")
+	dotCorner.CornerRadius = UDim.new(0, 8)
+	dotCorner.Parent = toggleDot
+	
+	local isOn = false
+	
+	local function updateToggle(state)
+		isOn = state
+		if isOn then
+			toggleBtn.BackgroundColor3 = COLORS.ToggleOn
+			toggleDot.Position = UDim2.new(0, 21, 0.5, -8)
+			toggleDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		else
+			toggleBtn.BackgroundColor3 = COLORS.ToggleOff
+			toggleDot.Position = UDim2.new(0, 3, 0.5, -8)
+			toggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+		end
+	end
+	
+	toggleBtn.MouseButton1Click:Connect(function()
+		local newState = not isOn
+		updateToggle(newState)
+		
+		if _G.SetGeneratorBoostEnabled then
+			_G.SetGeneratorBoostEnabled(newState)
+		end
+	end)
+	
+	-- Загружаем состояние
+	task.wait(0.1)
+	if _G.GetGeneratorBoostEnabled then
+		local state = _G.GetGeneratorBoostEnabled()
+		if state ~= nil then
+			updateToggle(state)
+		end
+	end
+	
+	return updateToggle
+end
+
+-- ============================================
+--   СОЗДАНИЕ СЛАЙДЕРА
+-- ============================================
+local function createSlider(parent, labelText, minValue, maxValue, step, getter, setter)
+	local container = Instance.new("Frame")
+	container.Size = UDim2.new(1, 0, 0, 55)
+	container.BackgroundTransparency = 1
+	container.Parent = parent
+	
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, -80, 0, 20)
+	label.BackgroundTransparency = 1
+	label.Text = labelText
+	label.TextColor3 = COLORS.Text
+	label.TextSize = 13
+	label.Font = Enum.Font.Gotham
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = container
+	
+	local valueLabel = Instance.new("TextLabel")
+	valueLabel.Size = UDim2.new(0, 60, 0, 20)
+	valueLabel.Position = UDim2.new(1, -60, 0, 0)
+	valueLabel.BackgroundTransparency = 1
+	valueLabel.Text = "0%"
+	valueLabel.TextColor3 = COLORS.Accent
+	valueLabel.TextSize = 13
+	valueLabel.Font = Enum.Font.GothamBold
+	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+	valueLabel.Parent = container
+	
+	local sliderBg = Instance.new("Frame")
+	sliderBg.Size = UDim2.new(1, 0, 0, 6)
+	sliderBg.Position = UDim2.new(0, 0, 1, -8)
+	sliderBg.BackgroundColor3 = COLORS.SliderBg
+	sliderBg.BorderSizePixel = 0
+	sliderBg.Parent = container
+	
+	local sliderBgCorner = Instance.new("UICorner")
+	sliderBgCorner.CornerRadius = UDim.new(0, 3)
+	sliderBgCorner.Parent = sliderBg
+	
+	local sliderFill = Instance.new("Frame")
+	sliderFill.Size = UDim2.new(0, 0, 1, 0)
+	sliderFill.BackgroundColor3 = COLORS.SliderFill
+	sliderFill.BorderSizePixel = 0
+	sliderFill.Parent = sliderBg
+	
+	local sliderFillCorner = Instance.new("UICorner")
+	sliderFillCorner.CornerRadius = UDim.new(0, 3)
+	sliderFillCorner.Parent = sliderFill
+	
+	local dragButton = Instance.new("TextButton")
+	dragButton.Size = UDim2.new(0, 16, 0, 16)
+	dragButton.Position = UDim2.new(0, -8, 1, -8)
+	dragButton.BackgroundColor3 = COLORS.Accent
+	dragButton.BackgroundTransparency = 0
+	dragButton.BorderSizePixel = 0
+	dragButton.Text = ""
+	dragButton.Parent = container
+	
+	local dragButtonCorner = Instance.new("UICorner")
+	dragButtonCorner.CornerRadius = UDim.new(0, 8)
+	dragButtonCorner.Parent = dragButton
+	
+	local currentValue = 50
+	local isDragging = false
+	
+	local function updateSlider(value)
+		currentValue = math.clamp(value, minValue, maxValue)
+		if step then
+			currentValue = math.floor(currentValue / step + 0.5) * step
+		end
+		currentValue = math.clamp(currentValue, minValue, maxValue)
+		
+		local percent = (currentValue - minValue) / (maxValue - minValue)
+		sliderFill.Size = UDim2.new(percent, 0, 1, 0)
+		dragButton.Position = UDim2.new(percent, -8, 1, -8)
+		valueLabel.Text = math.floor(currentValue) .. "%"
+		
+		if setter then
+			setter(currentValue)
+		end
+	end
+	
+	local function getSliderPosition(input)
+		local relativeX = input.Position.X - sliderBg.AbsolutePosition.X
+		local width = sliderBg.AbsoluteSize.X
+		local percent = math.clamp(relativeX / width, 0, 1)
+		local value = minValue + (maxValue - minValue) * percent
+		return value
+	end
+	
+	dragButton.MouseButton1Down:Connect(function()
+		isDragging = true
+		dragButton.BackgroundColor3 = COLORS.Text
+	end)
+	
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			isDragging = false
+			dragButton.BackgroundColor3 = COLORS.Accent
+		end
+	end)
+	
+	sliderBg.MouseButton1Down:Connect(function(input)
+		local value = getSliderPosition(input)
+		updateSlider(value)
+	end)
+	
+	UserInputService.InputChanged:Connect(function(input)
+		if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local value = getSliderPosition(input)
+			updateSlider(value)
+		end
+	end)
+	
+	-- Загружаем начальное значение
+	task.wait(0.1)
+	if getter then
+		local initialValue = getter()
+		if initialValue ~= nil then
+			updateSlider(initialValue)
+		end
+	end
+	
+	return updateSlider
+end
+
+-- ============================================
 --   СОЗДАНИЕ ВСЕХ ВКЛАДОК
 -- ============================================
 createTab("Visual", "👁️")
@@ -377,7 +585,7 @@ createTab("Misc", "⚙")
 createTab("Settings", "🔧")
 
 -- ============================================
---   НАПОЛНЕНИЕ ВКЛАДКИ VISUAL (ВСЕ КНОПКИ ESP)
+--   НАПОЛНЕНИЕ ВКЛАДКИ VISUAL
 -- ============================================
 local visualTab = tabs["Visual"]
 visualTab.Visible = true
@@ -453,21 +661,8 @@ miscSpacing2.Parent = visualTab
 createToggle(visualTab, "Full Bright", "FullBright")
 
 -- ============================================
---   ДРУГИЕ ВКЛАДКИ (ПУСТЫЕ, ДЛЯ БУДУЩИХ ФУНКЦИЙ)
+--   НАПОЛНЕНИЕ ВКЛАДКИ MODIFICATION (С БАФФОМ)
 -- ============================================
--- Movement
-local movementTab = tabs["Movement"]
-local movLabel = Instance.new("TextLabel")
-movLabel.Size = UDim2.new(1, 0, 0, 30)
-movLabel.BackgroundTransparency = 1
-movLabel.Text = "🚀 Movement options coming soon..."
-movLabel.TextColor3 = COLORS.TextDim
-movLabel.TextSize = 14
-movLabel.Font = Enum.Font.Gotham
-movLabel.TextXAlignment = Enum.TextXAlignment.Center
-movLabel.Parent = movementTab
-
--- Modification
 local modTab = tabs["Modification"]
 
 local modLayout = Instance.new("UIListLayout")
@@ -485,6 +680,66 @@ modPadding.Parent = modTab
 modTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
 modTab.CanvasSize = UDim2.new(0, 0, 0, 0)
 
+-- ============================================
+--   РАЗДЕЛ: GENERATOR BOOST
+-- ============================================
+local boostTitle = Instance.new("TextLabel")
+boostTitle.Size = UDim2.new(1, 0, 0, 25)
+boostTitle.BackgroundTransparency = 1
+boostTitle.Text = "▶ Generator Boost"
+boostTitle.TextColor3 = COLORS.Accent
+boostTitle.TextSize = 14
+boostTitle.Font = Enum.Font.GothamBold
+boostTitle.TextXAlignment = Enum.TextXAlignment.Left
+boostTitle.Parent = modTab
+
+local boostSpacing = Instance.new("Frame")
+boostSpacing.Size = UDim2.new(1, 0, 0, 5)
+boostSpacing.BackgroundTransparency = 1
+boostSpacing.Parent = modTab
+
+-- Toggle для включения баффа
+local boostToggle = createBoostToggle(modTab, "Enable Generator Boost")
+
+local boostSpacing2 = Instance.new("Frame")
+boostSpacing2.Size = UDim2.new(1, 0, 0, 5)
+boostSpacing2.BackgroundTransparency = 1
+boostSpacing2.Parent = modTab
+
+-- Слайдер для настройки процента баффа
+local boostSlider = createSlider(
+	modTab,
+	"Boost Speed",
+	0, 100, 1,
+	_G.GetGeneratorBoostPercent,
+	_G.SetGeneratorBoostPercent
+)
+
+local boostInfoLabel = Instance.new("TextLabel")
+boostInfoLabel.Size = UDim2.new(1, 0, 0, 20)
+boostInfoLabel.BackgroundTransparency = 1
+boostInfoLabel.Text = "0% = no boost, 100% = 2x speed"
+boostInfoLabel.TextColor3 = COLORS.TextDim
+boostInfoLabel.TextSize = 10
+boostInfoLabel.Font = Enum.Font.Gotham
+boostInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+boostInfoLabel.Parent = modTab
+
+-- Разделитель
+local modDivider = Instance.new("Frame")
+modDivider.Size = UDim2.new(1, 0, 0, 1)
+modDivider.BackgroundColor3 = COLORS.Darker
+modDivider.BackgroundTransparency = 0.5
+modDivider.Parent = modTab
+
+local modSpacing = Instance.new("Frame")
+modSpacing.Size = UDim2.new(1, 0, 0, 10)
+modSpacing.BackgroundTransparency = 1
+modSpacing.Parent = modTab
+
+-- ============================================
+--   РАЗДЕЛ: ANIMATIONS
+-- ============================================
 local animTitle = Instance.new("TextLabel")
 animTitle.Size = UDim2.new(1, 0, 0, 25)
 animTitle.BackgroundTransparency = 1
@@ -632,6 +887,21 @@ player.CharacterAdded:Connect(function()
     stopMenuAnimation()
 end)
 
+-- ============================================
+--   ДРУГИЕ ВКЛАДКИ (ПУСТЫЕ)
+-- ============================================
+-- Movement
+local movementTab = tabs["Movement"]
+local movLabel = Instance.new("TextLabel")
+movLabel.Size = UDim2.new(1, 0, 0, 30)
+movLabel.BackgroundTransparency = 1
+movLabel.Text = "🚀 Movement options coming soon..."
+movLabel.TextColor3 = COLORS.TextDim
+movLabel.TextSize = 14
+movLabel.Font = Enum.Font.Gotham
+movLabel.TextXAlignment = Enum.TextXAlignment.Center
+movLabel.Parent = movementTab
+
 -- Combat
 local combatTab = tabs["Combat"]
 local combatLabel = Instance.new("TextLabel")
@@ -702,3 +972,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 print("[SOEKKI] UI loaded! Press RightShift to toggle.")
+print("[SOEKKI] Generator boost controls added to Modification tab!")

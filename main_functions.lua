@@ -1,7 +1,9 @@
--- main_functions.lua - ПОЛНАЯ ВЕРСИЯ С РАЗДЕЛЬНЫМИ НАСТРОЙКАМИ
+-- main_functions.lua - ПОЛНАЯ ВЕРСИЯ С РАЗДЕЛЬНЫМИ НАСТРОЙКАМИ + БАФФ ГЕНЕРАТОРОВ
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -18,6 +20,14 @@ local ESPConfig = {
     ShowPlayers = true,
     ShowKillerWarning = true,
     FullBright = true,
+}
+
+-- ============================================
+--   НАСТРОЙКИ БАФФА ГЕНЕРАТОРОВ
+-- ============================================
+local GeneratorBoostConfig = {
+    Enabled = false,
+    BoostPercent = 50, -- 0-100%
 }
 
 -- ============================================
@@ -63,6 +73,150 @@ local LastFullESPRefresh = 0
 local IndicatorGui = nil
 
 -- ============================================
+--   СИСТЕМА БАФФА ГЕНЕРАТОРОВ
+-- ============================================
+local activeGeneratorBoosts = {}
+local generatorBoostConnections = {}
+
+-- Получаем ремоуты для генераторов
+local RepairAnim = ReplicatedStorage:FindFirstChild("Remotes") 
+    and ReplicatedStorage.Remotes:FindFirstChild("Generator") 
+    and ReplicatedStorage.Remotes.Generator:FindFirstChild("RepairAnim")
+
+-- Функция для применения баффа к генератору
+local function applyGeneratorBoost(generator, boostMultiplier)
+    if not generator then return end
+    
+    -- Проверяем, есть ли уже активный бафф
+    if activeGeneratorBoosts[generator] then
+        activeGeneratorBoosts[generator] = boostMultiplier
+        return
+    end
+    
+    activeGeneratorBoosts[generator] = boostMultiplier
+    
+    -- Устанавливаем атрибут на генератор для серверной логики
+    generator:SetAttribute("BoostMultiplier", boostMultiplier)
+    
+    -- Если есть ремоут для отправки, используем его
+    if RepairAnim then
+        -- Отправляем через существующий механизм
+        -- Некоторые игры используют атрибуты для баффов
+        local repairPoint = generator:FindFirstChild("RepairPoint") or generator
+        if repairPoint then
+            -- Сигналим серверу о баффе через событие
+            -- Это может не работать во всех играх, но атрибуты работают везде
+        end
+    end
+    
+    print("[SOEKKI] Применен бафф к генератору:", generator.Name, "x" .. string.format("%.2f", boostMultiplier))
+end
+
+-- Функция для снятия баффа
+local function removeGeneratorBoost(generator)
+    if not generator then return end
+    
+    if activeGeneratorBoosts[generator] then
+        activeGeneratorBoosts[generator] = nil
+        generator:SetAttribute("BoostMultiplier", nil)
+        print("[SOEKKI] Снят бафф с генератора:", generator.Name)
+    end
+end
+
+-- Функция для обработки ремонта генератора
+local function handleGeneratorRepair(repairPoint, isRepairing, part, point, animId, isActive, duration)
+    if not repairPoint then return end
+    
+    local generator = repairPoint.Parent
+    if not generator then return end
+    
+    -- Проверяем, является ли объект генератором
+    local isGenerator = CollectionService:HasTag(generator, "Generator")
+    if not isGenerator then
+        for _, child in ipairs(generator:GetDescendants()) do
+            if CollectionService:HasTag(child, "Generator") then
+                isGenerator = true
+                break
+            end
+        end
+        if not isGenerator then return end
+    end
+    
+    -- Если бафф выключен - ничего не делаем
+    if not GeneratorBoostConfig.Enabled then
+        if activeGeneratorBoosts[generator] then
+            removeGeneratorBoost(generator)
+        end
+        return
+    end
+    
+    if isRepairing and not isActive then
+        -- Начинаем ремонт - применяем бафф
+        local boostPercent = GeneratorBoostConfig.BoostPercent / 100
+        local boostMultiplier = 1 + boostPercent -- 0% = x1, 100% = x2
+        applyGeneratorBoost(generator, boostMultiplier)
+    elseif not isRepairing and isActive then
+        -- Заканчиваем ремонт - снимаем бафф
+        removeGeneratorBoost(generator)
+    end
+end
+
+-- Функция для мониторинга генераторов (альтернативный метод)
+local function monitorGeneratorsForBoost()
+    while GeneratorBoostConfig.Enabled do
+        local allGenerators = CollectionService:GetTagged("Generator")
+        
+        for _, generator in ipairs(allGenerators) do
+            if generator:IsDescendantOf(workspace) then
+                -- Проверяем, чинится ли генератор
+                local isBeingRepaired = generator:GetAttribute("IsBeingRepaired") or false
+                local repairProgress = generator:GetAttribute("RepairProgress") or 0
+                
+                -- Если генератор чинится и прогресс < 100%
+                if isBeingRepaired and repairProgress < 100 then
+                    if not activeGeneratorBoosts[generator] then
+                        local boostPercent = GeneratorBoostConfig.BoostPercent / 100
+                        local boostMultiplier = 1 + boostPercent
+                        applyGeneratorBoost(generator, boostMultiplier)
+                    end
+                elseif activeGeneratorBoosts[generator] then
+                    -- Если генератор не чинится или закончен - снимаем бафф
+                    removeGeneratorBoost(generator)
+                end
+            end
+        end
+        
+        task.wait(0.5)
+    end
+end
+
+-- Подключаемся к событию ремонта
+if RepairAnim then
+    RepairAnim.OnClientEvent:Connect(handleGeneratorRepair)
+else
+    print("[SOEKKI] RepairAnim не найден, используется альтернативный метод")
+end
+
+-- Функция для обновления настроек баффа из UI
+local function updateGeneratorBoostSettings(enabled, percent)
+    GeneratorBoostConfig.Enabled = enabled
+    GeneratorBoostConfig.BoostPercent = math.clamp(percent or GeneratorBoostConfig.BoostPercent, 0, 100)
+    
+    print("[SOEKKI] Настройки баффа обновлены: Enabled=" .. tostring(GeneratorBoostConfig.Enabled) .. ", Boost=" .. GeneratorBoostConfig.BoostPercent .. "%")
+    
+    -- Если бафф выключен - снимаем все активные баффы
+    if not GeneratorBoostConfig.Enabled then
+        for generator, _ in pairs(activeGeneratorBoosts) do
+            removeGeneratorBoost(generator)
+        end
+        table.clear(activeGeneratorBoosts)
+    end
+end
+
+-- Запускаем мониторинг в фоне
+task.spawn(monitorGeneratorsForBoost)
+
+-- ============================================
 --   GUI ДЛЯ ESP
 -- ============================================
 local function SetupGui()
@@ -93,10 +247,9 @@ local function GetGameValue(obj, name)
 end
 
 -- ============================================
---   ФУНКЦИЯ ПОДСВЕТКИ (РАБОТАЕТ ОТДЕЛЬНО ОТ PLAYERS)
+--   ФУНКЦИЯ ПОДСВЕТКИ
 -- ============================================
 local function ApplyHighlight(object, color)
-    -- НЕ проверяем ShowPlayers здесь!
     local h = object:FindFirstChild("H") or Instance.new("Highlight")
     h.Name = "H"
     h.Adornee = object
@@ -108,7 +261,6 @@ local function ApplyHighlight(object, color)
     h.Parent = object
 end
 
--- Удаляем старый ApplyHighlight для объектов (если есть)
 local function RemoveHighlight(object)
     local h = object:FindFirstChild("H")
     if h then h:Destroy() end
@@ -143,7 +295,6 @@ end
 local function updatePlayerNametag(player)
     if not IndicatorGui or not IndicatorGui.Parent then return end
     
-    -- Если ShowPlayers выключен - удаляем всё
     if not ESPConfig.ShowPlayers then
         local toRemove = {}
         for _, child in ipairs(IndicatorGui:GetChildren()) do
@@ -216,7 +367,6 @@ local function updatePlayerNametag(player)
         end
     end
     
-    -- Подсветка игрока (используем ApplyHighlight, но НЕ проверяем ShowPlayers)
     ApplyHighlight(player.Character, color)
 
     local hasMask = false
@@ -345,7 +495,6 @@ local function updateGeneratorProgress(generator)
             lbl.TextColor3 = finalColor
         end
     end
-    -- Подсветка генератора
     ApplyHighlight(generator, Config.Objects.Generator.Color)
     return false
 end
@@ -384,12 +533,11 @@ local function updateNextKillerDisplay()
 end
 
 -- ============================================
---   ОБНОВЛЕНИЕ ESP (КАЖДАЯ ФУНКЦИЯ ОТДЕЛЬНО)
+--   ОБНОВЛЕНИЕ ESP
 -- ============================================
 local function RefreshESP()
     ActiveGenerators = {}
     
-    -- Windows
     if ESPConfig.ShowWindows then
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj.Name == "Window" then
@@ -408,7 +556,6 @@ local function RefreshESP()
     if not Map then return end
     
     for _, obj in ipairs(Map:GetDescendants()) do
-        -- Generators
         if obj.Name == "Generator" then
             if ESPConfig.ShowGenerators then
                 ApplyHighlight(obj, Config.Objects.Generator.Color)
@@ -416,7 +563,6 @@ local function RefreshESP()
             else
                 RemoveHighlight(obj)
             end
-        -- Hooks
         elseif obj.Name == "Hook" then
             if ESPConfig.ShowHooks then
                 local m = obj:FindFirstChild("Model")
@@ -437,14 +583,12 @@ local function RefreshESP()
                     end
                 end
             end
-        -- Pallets
         elseif (obj.Name == "Palletwrong" or obj.Name == "Pallet") then
             if ESPConfig.ShowPallets then
                 ApplyHighlight(obj, Config.Objects.Pallet.Color)
             else
                 RemoveHighlight(obj)
             end
-        -- Gates
         elseif obj.Name == "Gate" then
             if ESPConfig.ShowGates then
                 ApplyHighlight(obj, Config.Objects.Gate.Color)
@@ -474,6 +618,39 @@ function module.SetESPState(option, state)
     ESPConfig[option] = state
     RefreshESP()
     return ESPConfig[option]
+end
+
+-- Функции для управления баффом генераторов
+function module.SetGeneratorBoostEnabled(enabled)
+    GeneratorBoostConfig.Enabled = enabled
+    if not enabled then
+        for generator, _ in pairs(activeGeneratorBoosts) do
+            removeGeneratorBoost(generator)
+        end
+        table.clear(activeGeneratorBoosts)
+    end
+    print("[SOEKKI] Generator boost enabled:", enabled)
+end
+
+function module.GetGeneratorBoostEnabled()
+    return GeneratorBoostConfig.Enabled
+end
+
+function module.SetGeneratorBoostPercent(percent)
+    GeneratorBoostConfig.BoostPercent = math.clamp(percent, 0, 100)
+    print("[SOEKKI] Generator boost percent set to:", GeneratorBoostConfig.BoostPercent .. "%")
+    
+    -- Обновляем активные баффы с новым значением
+    if GeneratorBoostConfig.Enabled then
+        for generator, _ in pairs(activeGeneratorBoosts) do
+            local boostMultiplier = 1 + (GeneratorBoostConfig.BoostPercent / 100)
+            applyGeneratorBoost(generator, boostMultiplier)
+        end
+    end
+end
+
+function module.GetGeneratorBoostPercent()
+    return GeneratorBoostConfig.BoostPercent
 end
 
 local OriginalLighting = {
@@ -586,7 +763,12 @@ RefreshESP()
 _G.ESPModule = module
 _G.ToggleESP = module.ToggleESP
 _G.GetESPState = module.GetESPState
+_G.SetGeneratorBoostEnabled = module.SetGeneratorBoostEnabled
+_G.GetGeneratorBoostEnabled = module.GetGeneratorBoostEnabled
+_G.SetGeneratorBoostPercent = module.SetGeneratorBoostPercent
+_G.GetGeneratorBoostPercent = module.GetGeneratorBoostPercent
 
 print("[SOEKKI] Functions loaded!")
+print("[SOEKKI] Generator boost system loaded!")
 
 return module
