@@ -1,4 +1,4 @@
--- main_functions.lua - С МАКСИМАЛЬНЫМ ЛОГИРОВАНИЕМ
+-- main_functions.lua - ВЕРСИЯ С ОТПРАВКОЙ НА СЕРВЕР (как в perfectionist)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
@@ -79,13 +79,33 @@ local LastFullESPRefresh = 0
 local IndicatorGui = nil
 
 -- ============================================
---   СИСТЕМА БАФФА ГЕНЕРАТОРОВ
+--   СИСТЕМА БАФФА ГЕНЕРАТОРОВ (КАК В PERFECTIONIST)
 -- ============================================
 local activeGeneratorBoosts = {}
+local currentGenerator = nil  -- Текущий генератор, который мы чиним
+local boostType = nil  -- "fast" или "slow"
 
-print("[SOEKKI] Инициализация системы баффа...")
+-- Получаем ремоуты как в perfectionist.txt
+local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
+local Generator = Remotes and Remotes:FindFirstChild("Generator")
+local RepairAnim = Generator and Generator:FindFirstChild("RepairAnim")
+local perfectionistplanning = Remotes and Remotes:FindFirstChild("Perks") and Remotes.Perks:FindFirstChild("perfectionistplanning")
 
--- Функция для применения баффа
+print("[SOEKKI] RepairAnim найден:", RepairAnim ~= nil)
+print("[SOEKKI] perfectionistplanning найден:", perfectionistplanning ~= nil)
+
+-- Функция для определения типа баффа (fast/slow) по проценту
+local function getBoostType()
+    if GeneratorBoostConfig.BoostPercent >= 75 then
+        return "fast"
+    elseif GeneratorBoostConfig.BoostPercent >= 25 then
+        return "medium"
+    else
+        return "slow"
+    end
+end
+
+-- Функция для применения баффа (отправка на сервер)
 local function applyGeneratorBoost(generator)
     print("[SOEKKI] [applyGeneratorBoost] ВЫЗВАНА для:", generator and generator.Name or "nil")
     
@@ -99,63 +119,44 @@ local function applyGeneratorBoost(generator)
         return
     end
     
-    local boostPercent = GeneratorBoostConfig.BoostPercent / 100
-    local boostMultiplier = 1 + boostPercent
+    local boostType = getBoostType()
+    print("[SOEKKI] [applyGeneratorBoost] Тип баффа:", boostType)
+    print("[SOEKKI] [applyGeneratorBoost] Процент:", GeneratorBoostConfig.BoostPercent .. "%")
     
-    print("[SOEKKI] [applyGeneratorBoost] Процент баффа:", GeneratorBoostConfig.BoostPercent .. "%")
-    print("[SOEKKI] [applyGeneratorBoost] Множитель:", string.format("%.2f", boostMultiplier))
+    -- Сохраняем текущий генератор
+    currentGenerator = generator
     
-    if activeGeneratorBoosts[generator] then
-        if math.abs(activeGeneratorBoosts[generator] - boostMultiplier) < 0.01 then
-            print("[SOEKKI] [applyGeneratorBoost] Бафф уже применен с таким же значением")
-            return
+    -- ОТПРАВЛЯЕМ НА СЕРВЕР как в perfectionist.txt
+    if perfectionistplanning then
+        print("[SOEKKI] [applyGeneratorBoost] Отправляем на сервер: applyBoost", boostType)
+        perfectionistplanning:FireServer("applyBoost", boostType)
+        print("[SOEKKI] ✅✅✅ БАФФ ОТПРАВЛЕН НА СЕРВЕР! Тип:", boostType)
+    else
+        print("[SOEKKI] [applyGeneratorBoost] ❌ perfectionistplanning не найден!")
+        print("[SOEKKI] [applyGeneratorBoost] Пытаемся найти альтернативный ремоут...")
+        
+        -- Ищем альтернативные ремоуты
+        local Perks = Remotes and Remotes:FindFirstChild("Perks")
+        if Perks then
+            for _, child in ipairs(Perks:GetChildren()) do
+                print("[SOEKKI]   Найден ремоут:", child.Name)
+                if child.Name:lower():find("boost") or child.Name:lower():find("repair") then
+                    print("[SOEKKI]   Пробуем отправить в:", child.Name)
+                    pcall(function()
+                        child:FireServer("applyBoost", boostType)
+                    end)
+                end
+            end
         end
-        print("[SOEKKI] [applyGeneratorBoost] Обновляем существующий бафф")
     end
     
-    activeGeneratorBoosts[generator] = boostMultiplier
-    print("[SOEKKI] [applyGeneratorBoost] Добавлен в activeGeneratorBoosts")
-    
-    -- Устанавливаем атрибуты
-    print("[SOEKKI] [applyGeneratorBoost] Устанавливаем атрибуты...")
-    
-    local success, err = pcall(function()
-        generator:SetAttribute("repairboost", boostMultiplier)
-        print("[SOEKKI] [applyGeneratorBoost] ✅ repairboost =", boostMultiplier)
-        generator:SetAttribute("BoostMultiplier", boostMultiplier)
-        print("[SOEKKI] [applyGeneratorBoost] ✅ BoostMultiplier =", boostMultiplier)
-        generator:SetAttribute("GeneratorBoost", boostMultiplier)
-        print("[SOEKKI] [applyGeneratorBoost] ✅ GeneratorBoost =", boostMultiplier)
+    -- Также устанавливаем атрибуты для надежности
+    pcall(function()
+        generator:SetAttribute("repairboost", 1 + GeneratorBoostConfig.BoostPercent / 100)
+        generator:SetAttribute("BoostMultiplier", 1 + GeneratorBoostConfig.BoostPercent / 100)
     end)
     
-    if not success then
-        print("[SOEKKI] [applyGeneratorBoost] ❌ Ошибка установки атрибутов:", err)
-    end
-    
-    -- На все части
-    local partsCount = 0
-    for _, part in ipairs(generator:GetDescendants()) do
-        if part:IsA("BasePart") then
-            pcall(function()
-                part:SetAttribute("repairboost", boostMultiplier)
-                partsCount = partsCount + 1
-            end)
-        end
-    end
-    print("[SOEKKI] [applyGeneratorBoost] Установлено на", partsCount, "частей")
-    
-    -- Ищем RepairPoint
-    local repairPoint = generator:FindFirstChild("RepairPoint")
-    if repairPoint then
-        pcall(function()
-            repairPoint:SetAttribute("repairboost", boostMultiplier)
-            print("[SOEKKI] [applyGeneratorBoost] ✅ RepairPoint обновлен")
-        end)
-    else
-        print("[SOEKKI] [applyGeneratorBoost] RepairPoint не найден")
-    end
-    
-    print("[SOEKKI] ✅✅✅ БАФФ ПРИМЕНЕН к:", generator.Name, "x" .. string.format("%.2f", boostMultiplier))
+    activeGeneratorBoosts[generator] = boostType
     print("[SOEKKI] ========================================")
 end
 
@@ -169,39 +170,28 @@ local function removeGeneratorBoost(generator)
     end
     
     if not activeGeneratorBoosts[generator] then
-        print("[SOEKKI] [removeGeneratorBoost] ⚠️ Бафф не найден в activeGeneratorBoosts")
+        print("[SOEKKI] [removeGeneratorBoost] ⚠️ Бафф не найден")
         return
     end
     
-    activeGeneratorBoosts[generator] = nil
-    print("[SOEKKI] [removeGeneratorBoost] Удален из activeGeneratorBoosts")
+    -- ОТПРАВЛЯЕМ НА СЕРВЕР снятие баффа
+    if perfectionistplanning then
+        print("[SOEKKI] [removeGeneratorBoost] Отправляем на сервер: clearBoost")
+        perfectionistplanning:FireServer("clearBoost")
+        print("[SOEKKI] ❌❌❌ БАФФ СНЯТ (отправлено на сервер)")
+    end
     
-    print("[SOEKKI] [removeGeneratorBoost] Снимаем атрибуты...")
-    
+    -- Снимаем атрибуты
     pcall(function()
         generator:SetAttribute("repairboost", nil)
         generator:SetAttribute("BoostMultiplier", nil)
-        generator:SetAttribute("GeneratorBoost", nil)
-        print("[SOEKKI] [removeGeneratorBoost] ✅ Атрибуты сняты с генератора")
     end)
     
-    for _, part in ipairs(generator:GetDescendants()) do
-        if part:IsA("BasePart") then
-            pcall(function()
-                part:SetAttribute("repairboost", nil)
-            end)
-        end
+    activeGeneratorBoosts[generator] = nil
+    if currentGenerator == generator then
+        currentGenerator = nil
     end
     
-    local repairPoint = generator:FindFirstChild("RepairPoint")
-    if repairPoint then
-        pcall(function()
-            repairPoint:SetAttribute("repairboost", nil)
-            print("[SOEKKI] [removeGeneratorBoost] ✅ RepairPoint очищен")
-        end)
-    end
-    
-    print("[SOEKKI] ❌❌❌ БАФФ СНЯТ с:", generator.Name)
     print("[SOEKKI] ========================================")
 end
 
@@ -211,7 +201,8 @@ end
 local function onRepairAnim(p1, p2, p3, p4, p5, p6)
     print("[SOEKKI] [onRepairAnim] ========================================")
     print("[SOEKKI] [onRepairAnim] ВЫЗВАНА!")
-    print("[SOEKKI] [onRepairAnim] Аргументы:")
+    
+    -- Выводим все аргументы
     print("[SOEKKI]   p1 =", p1, "тип:", type(p1))
     print("[SOEKKI]   p2 =", p2, "тип:", type(p2))
     print("[SOEKKI]   p3 =", p3, "тип:", type(p3))
@@ -220,164 +211,141 @@ local function onRepairAnim(p1, p2, p3, p4, p5, p6)
     print("[SOEKKI]   p6 =", p6, "тип:", type(p6))
     
     if p2 == true then
-        print("[SOEKKI] [onRepairAnim] 🔧 НАЧАЛО РЕМОНТА (p2 = true)")
+        print("[SOEKKI] 🔧 НАЧАЛО РЕМОНТА")
     elseif p2 == false then
-        print("[SOEKKI] [onRepairAnim] 🛑 КОНЕЦ РЕМОНТА (p2 = false)")
+        print("[SOEKKI] 🛑 КОНЕЦ РЕМОНТА")
     else
-        print("[SOEKKI] [onRepairAnim] ⚠️ НЕИЗВЕСТНОЕ ЗНАЧЕНИЕ p2 =", p2)
+        print("[SOEKKI] ⚠️ НЕИЗВЕСТНОЕ ЗНАЧЕНИЕ p2 =", p2)
+        return
+    end
+    
+    -- Ищем генератор как в perfectionist.txt
+    local generator = nil
+    
+    -- Способ 1: p3.Parent (как в perfectionist)
+    if p3 and p3.Parent then
+        generator = p3.Parent
+        print("[SOEKKI] Способ 1 (p3.Parent):", generator and generator.Name or "nil")
+    end
+    
+    -- Способ 2: если p3 это CFrame, то p4 может быть объектом
+    if not generator and p4 and p4.Parent then
+        generator = p4.Parent
+        print("[SOEKKI] Способ 2 (p4.Parent):", generator and generator.Name or "nil")
+    end
+    
+    -- Способ 3: ищем среди аргументов объект с Parent
+    if not generator then
+        local args = {p1, p2, p3, p4, p5, p6}
+        for i, arg in ipairs(args) do
+            if type(arg) == "table" and arg.Parent and type(arg.Parent) == "table" then
+                generator = arg.Parent
+                print("[SOEKKI] Способ 3 (аргумент #" .. i .. ".Parent):", generator and generator.Name or "nil")
+                break
+            end
+        end
+    end
+    
+    if not generator then
+        print("[SOEKKI] ❌ Не удалось найти генератор!")
+        return
+    end
+    
+    -- Проверяем, что это генератор
+    local isGenerator = CollectionService:HasTag(generator, "Generator")
+    print("[SOEKKI] CollectionService:HasTag =", isGenerator)
+    print("[SOEKKI] generator.Name =", generator.Name)
+    
+    if not isGenerator then
+        -- Проверяем дочерние элементы
+        for _, child in ipairs(generator:GetDescendants()) do
+            if CollectionService:HasTag(child, "Generator") then
+                isGenerator = true
+                generator = child
+                print("[SOEKKI] Найден генератор в дочерних элементах:", generator.Name)
+                break
+            end
+        end
+    end
+    
+    if not isGenerator then
+        print("[SOEKKI] ⚠️ Это НЕ генератор, пропускаем")
+        return
     end
     
     if p2 == true then
         -- Начало ремонта
-        if not (p3 and p3.Parent) then
-            print("[SOEKKI] [onRepairAnim] ❌ ОШИБКА: p3 или p3.Parent = nil")
-            print("[SOEKKI] [onRepairAnim] p3 =", p3)
-            return
-        end
-        
-        local generator = p3.Parent
-        print("[SOEKKI] [onRepairAnim] Генератор из p3.Parent:", generator and generator.Name or "nil")
-        
-        -- Проверяем теги
-        local hasTag = CollectionService:HasTag(generator, "Generator")
-        print("[SOEKKI] [onRepairAnim] CollectionService:HasTag(generator, 'Generator') =", hasTag)
-        
-        -- Проверяем имя
-        print("[SOEKKI] [onRepairAnim] generator.Name =", generator and generator.Name or "nil")
-        
-        if CollectionService:HasTag(generator, "Generator") then
-            print("[SOEKKI] [onRepairAnim] ✅ Это генератор!")
-            
-            if GeneratorBoostConfig.Enabled then
-                print("[SOEKKI] [onRepairAnim] ✅ Бафф включен, применяем...")
-                applyGeneratorBoost(generator)
-            else
-                print("[SOEKKI] [onRepairAnim] ⚠️ Бафф выключен, пропускаем")
-                print("[SOEKKI] [onRepairAnim] Включите бафф в меню (Modification -> Enable Generator Boost)")
-            end
+        if GeneratorBoostConfig.Enabled then
+            applyGeneratorBoost(generator)
         else
-            print("[SOEKKI] [onRepairAnim] ⚠️ Это НЕ генератор (нет тега Generator)")
+            print("[SOEKKI] ⚠️ Бафф выключен! Включите в меню (Modification -> Enable Generator Boost)")
         end
     else
         -- Конец ремонта
-        if p3 and p3.Parent then
-            local generator = p3.Parent
-            print("[SOEKKI] [onRepairAnim] Генератор из p3.Parent:", generator and generator.Name or "nil")
-            
-            if CollectionService:HasTag(generator, "Generator") then
-                print("[SOEKKI] [onRepairAnim] ✅ Это генератор, снимаем бафф")
-                removeGeneratorBoost(generator)
-            else
-                print("[SOEKKI] [onRepairAnim] ⚠️ Это НЕ генератор (нет тега Generator)")
-            end
-        else
-            print("[SOEKKI] [onRepairAnim] ⚠️ p3 или p3.Parent = nil, не можем определить генератор")
-        end
+        removeGeneratorBoost(generator)
     end
     
-    print("[SOEKKI] [onRepairAnim] ========================================")
+    print("[SOEKKI] ========================================")
 end
 
 -- ============================================
 --   ПОДКЛЮЧЕНИЕ РЕМОУТОВ
 -- ============================================
 local function setupRemoteListeners()
-    print("[SOEKKI] [setupRemoteListeners] ========================================")
     print("[SOEKKI] [setupRemoteListeners] Поиск ремоутов...")
     
-    local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    if not Remotes then 
-        print("[SOEKKI] [setupRemoteListeners] ❌ Remotes не найдены!")
-        return 
-    end
-    print("[SOEKKI] [setupRemoteListeners] ✅ Remotes найден")
-    
-    local Generator = Remotes:FindFirstChild("Generator")
-    if not Generator then 
-        print("[SOEKKI] [setupRemoteListeners] ❌ Generator ремоуты не найдены!")
-        return 
-    end
-    print("[SOEKKI] [setupRemoteListeners] ✅ Generator найден")
-    
-    -- Список всех ремоутов в Generator
-    print("[SOEKKI] [setupRemoteListeners] Содержимое Generator:")
-    for _, child in ipairs(Generator:GetChildren()) do
-        print("[SOEKKI]   -", child.Name, "(" .. child.ClassName .. ")")
-    end
-    
-    local RepairAnim = Generator:FindFirstChild("RepairAnim")
     if RepairAnim then
-        print("[SOEKKI] [setupRemoteListeners] ✅ RepairAnim найден, подключаем...")
+        print("[SOEKKI] ✅ RepairAnim найден, подключаем...")
         RepairAnim.OnClientEvent:Connect(onRepairAnim)
-        print("[SOEKKI] [setupRemoteListeners] ✅ RepairAnim подключен!")
+        print("[SOEKKI] ✅ RepairAnim подключен!")
     else
-        print("[SOEKKI] [setupRemoteListeners] ❌ RepairAnim не найден!")
-    end
-    
-    -- Также пробуем RepairEvent
-    local RepairEvent = Generator:FindFirstChild("RepairEvent")
-    if RepairEvent then
-        print("[SOEKKI] [setupRemoteListeners] ✅ RepairEvent найден, подключаем...")
-        RepairEvent.OnClientEvent:Connect(function(repairPoint, isRepairing)
-            print("[SOEKKI] [RepairEvent] ========================================")
-            print("[SOEKKI] [RepairEvent] ВЫЗВАН!")
-            print("[SOEKKI] [RepairEvent] repairPoint =", repairPoint)
-            print("[SOEKKI] [RepairEvent] isRepairing =", isRepairing)
-            
-            if repairPoint and repairPoint.Parent then
-                local generator = repairPoint.Parent
-                print("[SOEKKI] [RepairEvent] generator =", generator and generator.Name or "nil")
-                
-                if CollectionService:HasTag(generator, "Generator") then
-                    if isRepairing and GeneratorBoostConfig.Enabled then
-                        applyGeneratorBoost(generator)
-                    elseif not isRepairing then
-                        removeGeneratorBoost(generator)
-                    end
+        print("[SOEKKI] ❌ RepairAnim не найден!")
+        
+        -- Пробуем найти альтернативные пути
+        local paths = {
+            ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Generator"),
+            ReplicatedStorage:FindFirstChild("Generator"),
+            ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Repair")
+        }
+        
+        for _, path in ipairs(paths) do
+            if path then
+                local anim = path:FindFirstChild("RepairAnim")
+                if anim then
+                    print("[SOEKKI] Найден RepairAnim по альтернативному пути!")
+                    anim.OnClientEvent:Connect(onRepairAnim)
                 end
-            else
-                print("[SOEKKI] [RepairEvent] ⚠️ repairPoint или repairPoint.Parent = nil")
             end
-            print("[SOEKKI] [RepairEvent] ========================================")
-        end)
-        print("[SOEKKI] [setupRemoteListeners] ✅ RepairEvent подключен!")
-    else
-        print("[SOEKKI] [setupRemoteListeners] ⚠️ RepairEvent не найден")
+        end
     end
     
-    print("[SOEKKI] [setupRemoteListeners] ========================================")
+    -- Выводим все ремоуты в Perks
+    local Perks = Remotes and Remotes:FindFirstChild("Perks")
+    if Perks then
+        print("[SOEKKI] Содержимое Perks:")
+        for _, child in ipairs(Perks:GetChildren()) do
+            print("[SOEKKI]   -", child.Name)
+        end
+    end
 end
 
 -- Запускаем
 task.spawn(setupRemoteListeners)
 
 -- ============================================
---   МОНИТОРИНГ ГЕНЕРАТОРОВ (ДЛЯ ОТЛАДКИ)
+--   МОНИТОРИНГ (ДЛЯ ОТЛАДКИ)
 -- ============================================
 task.spawn(function()
-    print("[SOEKKI] [Monitor] Запуск мониторинга генераторов...")
-    local checkCount = 0
+    print("[SOEKKI] [Monitor] Запуск мониторинга...")
     
     while true do
-        checkCount = checkCount + 1
-        
-        -- Каждые 10 проверок выводим статус
-        if checkCount % 10 == 0 then
-            local gens = CollectionService:GetTagged("Generator")
-            print("[SOEKKI] [Monitor] Статус: найдено генераторов =", #gens)
-            print("[SOEKKI] [Monitor] Активных баффов =", table.getn(activeGeneratorBoosts))
-            
-            for gen, boost in pairs(activeGeneratorBoosts) do
-                if gen and gen.Parent then
-                    local progress = pcall(function() return gen:GetAttribute("RepairProgress") or 0 end)
-                    if type(progress) == "number" then
-                        print("[SOEKKI] [Monitor]   -", gen.Name, "бафф x" .. string.format("%.2f", boost), "прогресс:", string.format("%.1f%%", progress))
-                    end
-                end
-            end
+        if GeneratorBoostConfig.Enabled and currentGenerator then
+            print("[SOEKKI] [Monitor] Активный бафф на:", currentGenerator.Name)
+            print("[SOEKKI] [Monitor]   Тип:", activeGeneratorBoosts[currentGenerator] or "none")
+            print("[SOEKKI] [Monitor]   Процент:", GeneratorBoostConfig.BoostPercent .. "%")
         end
         
-        task.wait(5)
+        task.wait(10)
     end
 end)
 
@@ -388,7 +356,6 @@ local function SetupGui()
     print("[SOEKKI] [SetupGui] Создание GUI...")
     if PlayerGui:FindFirstChild("ChasedInds") then 
         PlayerGui:FindFirstChild("ChasedInds"):Destroy() 
-        print("[SOEKKI] [SetupGui] Старый GUI удален")
     end
     IndicatorGui = Instance.new("ScreenGui")
     IndicatorGui.Name = "ChasedInds"
@@ -775,10 +742,8 @@ end
 local module = {}
 
 function module.ToggleESP(option)
-    print("[SOEKKI] [ToggleESP] Переключение:", option)
     ESPConfig[option] = not ESPConfig[option]
     RefreshESP()
-    print("[SOEKKI] [ToggleESP] Новое состояние:", ESPConfig[option])
     return ESPConfig[option]
 end
 
@@ -787,32 +752,26 @@ function module.GetESPState(option)
 end
 
 function module.SetESPState(option, state)
-    print("[SOEKKI] [SetESPState] Установка:", option, "=", state)
     ESPConfig[option] = state
     RefreshESP()
     return ESPConfig[option]
 end
 
 function module.SetGeneratorBoostEnabled(enabled)
-    print("[SOEKKI] [SetGeneratorBoostEnabled] ========================================")
-    print("[SOEKKI] [SetGeneratorBoostEnabled] ВЫЗВАНА! enabled =", enabled)
-    
+    print("[SOEKKI] [SetGeneratorBoostEnabled] enabled =", enabled)
     GeneratorBoostConfig.Enabled = enabled
-    print("[SOEKKI] [SetGeneratorBoostEnabled] Новое состояние:", GeneratorBoostConfig.Enabled)
     
     if not enabled then
-        local count = 0
+        if perfectionistplanning then
+            print("[SOEKKI] Отправляем clearBoost на сервер")
+            perfectionistplanning:FireServer("clearBoost")
+        end
         for generator, _ in pairs(activeGeneratorBoosts) do
-            removeGeneratorBoost(generator)
-            count = count + 1
+            activeGeneratorBoosts[generator] = nil
         end
         table.clear(activeGeneratorBoosts)
-        print("[SOEKKI] [SetGeneratorBoostEnabled] Снято баффов:", count)
-    else
-        print("[SOEKKI] [SetGeneratorBoostEnabled] Бафф включен. Процент:", GeneratorBoostConfig.BoostPercent .. "%")
+        currentGenerator = nil
     end
-    
-    print("[SOEKKI] [SetGeneratorBoostEnabled] ========================================")
 end
 
 function module.GetGeneratorBoostEnabled()
@@ -820,26 +779,17 @@ function module.GetGeneratorBoostEnabled()
 end
 
 function module.SetGeneratorBoostPercent(percent)
-    print("[SOEKKI] [SetGeneratorBoostPercent] ========================================")
-    print("[SOEKKI] [SetGeneratorBoostPercent] ВЫЗВАНА! percent =", percent)
+    GeneratorBoostConfig.BoostPercent = math.clamp(percent, 0, 100)
+    print("[SOEKKI] Boost percent:", GeneratorBoostConfig.BoostPercent .. "%")
     
-    local newPercent = math.clamp(percent, 0, 100)
-    GeneratorBoostConfig.BoostPercent = newPercent
-    print("[SOEKKI] [SetGeneratorBoostPercent] Новое значение:", GeneratorBoostConfig.BoostPercent .. "%")
-    print("[SOEKKI] [SetGeneratorBoostPercent] Множитель:", string.format("%.2f", 1 + newPercent / 100))
-    
-    -- Обновляем активные баффы с новым значением
-    if GeneratorBoostConfig.Enabled then
-        print("[SOEKKI] [SetGeneratorBoostPercent] Обновляем активные баффы...")
-        local count = 0
-        for generator, _ in pairs(activeGeneratorBoosts) do
-            applyGeneratorBoost(generator)
-            count = count + 1
+    -- Если бафф включен и есть активный генератор, обновляем
+    if GeneratorBoostConfig.Enabled and currentGenerator then
+        local boostType = getBoostType()
+        if perfectionistplanning then
+            print("[SOEKKI] Обновляем бафф на сервере:", boostType)
+            perfectionistplanning:FireServer("applyBoost", boostType)
         end
-        print("[SOEKKI] [SetGeneratorBoostPercent] Обновлено баффов:", count)
     end
-    
-    print("[SOEKKI] [SetGeneratorBoostPercent] ========================================")
 end
 
 function module.GetGeneratorBoostPercent()
@@ -861,14 +811,12 @@ local LastFullBrightState = nil
 -- ============================================
 workspace.ChildAdded:Connect(function(c)
     if c.Name == "Map" then
-        print("[SOEKKI] Обнаружена карта (Map), обновляем ESP...")
         task.wait(1)
         RefreshESP()
     end
 end)
 
 LocalPlayer.CharacterAdded:Connect(function()
-    print("[SOEKKI] Персонаж создан, пересоздаем GUI...")
     SetupGui()
     task.wait(1)
 end)
@@ -965,14 +913,13 @@ _G.GetGeneratorBoostPercent = module.GetGeneratorBoostPercent
 
 print("[SOEKKI] ========================================")
 print("[SOEKKI] ✅ main_functions.lua ЗАГРУЖЕНА!")
-print("[SOEKKI] ✅ ESP система готова")
-print("[SOEKKI] ✅ Система баффа готова")
 print("[SOEKKI] ========================================")
 print("[SOEKKI] ИНСТРУКЦИЯ ПО ТЕСТИРОВАНИЮ:")
 print("[SOEKKI] 1. Откройте консоль (F9)")
-print("[SOEKKI] 2. Включите бафф в меню (Modification -> Enable Generator Boost)")
+print("[SOEKKI] 2. Включите бафф в меню")
 print("[SOEKKI] 3. Начните чинить генератор")
-print("[SOEKKI] 4. Смотрите логи в консоли")
+print("[SOEKKI] 4. Смотрите логи")
 print("[SOEKKI] ========================================")
+print("[SOEKKI] perfectionistplanning найден:", perfectionistplanning ~= nil)
 
 return module
