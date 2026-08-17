@@ -7,6 +7,18 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- ============================================
+--   MODIFICATION: AUTO PERFECT SKILL CHECK
+-- ============================================
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local ModificationConfig = {
+    AutoPerfect = false,
+}
+
+-- Флаг читается модифицированной логикой skillcheck_gen.
+_G.AutoPerfectSkillCheck = false
+
+-- ============================================
 --   НАСТРОЙКИ ESP (КАЖДАЯ ОТДЕЛЬНО)
 -- ============================================
 local ESPConfig = {
@@ -470,6 +482,32 @@ end
 -- ============================================
 local module = {}
 
+function module.GetModificationState(option)
+    return ModificationConfig[option]
+end
+
+function module.SetModificationState(option, state)
+    if ModificationConfig[option] == nil then
+        return nil
+    end
+
+    ModificationConfig[option] = state == true
+
+    if option == "AutoPerfect" then
+        _G.AutoPerfectSkillCheck = ModificationConfig.AutoPerfect
+    end
+
+    return ModificationConfig[option]
+end
+
+function module.ToggleModification(option)
+    if ModificationConfig[option] == nil then
+        return nil
+    end
+
+    return module.SetModificationState(option, not ModificationConfig[option])
+end
+
 function module.ToggleESP(option)
     if ESPConfig[option] == nil then
         return nil
@@ -591,6 +629,9 @@ _G.ESPModule = module
 _G.ToggleESP = module.ToggleESP
 _G.GetESPState = module.GetESPState
 _G.SetESPState = module.SetESPState
+_G.GetModificationState = module.GetModificationState
+_G.SetModificationState = module.SetModificationState
+_G.ToggleModification = module.ToggleModification
 
 print("[SOEKKI] Functions loaded!")
 
