@@ -1,4 +1,4 @@
--- main_ui.lua - ВСЕ ВКЛАДКИ + ВСЕ КНОПКИ ESP + БАФФ ГЕНЕРАТОРОВ
+-- main_ui.lua - ВСЕ ВКЛАДКИ + ESP + БАФФ ГЕНЕРАТОРОВ + АНИМАЦИИ
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
@@ -30,9 +30,6 @@ screenGui.DisplayOrder = 999999
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- ============================================
---   ГЛАВНЫЙ ФРЕЙМ
--- ============================================
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 600, 0, 450)
 mainFrame.Position = UDim2.new(0.5, -300, 0.5, -225)
@@ -47,258 +44,88 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 12)
 corner.Parent = mainFrame
 
-local accentBorder = Instance.new("Frame")
-accentBorder.Size = UDim2.new(1, 0, 1, 0)
-accentBorder.BackgroundColor3 = COLORS.Accent
-accentBorder.BackgroundTransparency = 0.85
-accentBorder.BorderSizePixel = 2
-accentBorder.BorderColor3 = COLORS.Accent
-accentBorder.ZIndex = 1002
-accentBorder.Parent = mainFrame
+local header = Instance.new("TextLabel")
+header.Size = UDim2.new(1, 0, 0, 40)
+header.BackgroundColor3 = COLORS.Darker
+header.Text = "SOEKKI - Violence District"
+header.TextColor3 = COLORS.Text
+header.TextSize = 18
+header.Font = Enum.Font.GothamBold
+header.Parent = mainFrame
 
-local accentCorner = Instance.new("UICorner")
-accentCorner.CornerRadius = UDim.new(0, 12)
-accentCorner.Parent = accentBorder
+local tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(1, 0, 0, 36)
+tabBar.Position = UDim2.new(0, 0, 0, 40)
+tabBar.BackgroundTransparency = 1
+tabBar.Parent = mainFrame
 
--- ============================================
---   ЗАГОЛОВОК
--- ============================================
-local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 35)
-titleBar.BackgroundColor3 = COLORS.Darker
-titleBar.BackgroundTransparency = 0.3
-titleBar.BorderSizePixel = 0
-titleBar.ZIndex = 1003
-titleBar.Parent = mainFrame
-
-local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 12)
-titleCorner.Parent = titleBar
-
-local titleLine = Instance.new("Frame")
-titleLine.Size = UDim2.new(1, 0, 0, 1.5)
-titleLine.Position = UDim2.new(0, 0, 1, 0)
-titleLine.BackgroundColor3 = COLORS.Accent
-titleLine.BackgroundTransparency = 0.3
-titleLine.BorderSizePixel = 0
-titleLine.ZIndex = 1004
-titleLine.Parent = titleBar
-
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -50, 1, 0)
-titleLabel.Position = UDim2.new(0, 15, 0, 0)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "◆ VIOLENCE DISTRICT v1.0.0"
-titleLabel.TextColor3 = COLORS.Text
-titleLabel.TextSize = 14
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.ZIndex = 1005
-titleLabel.Parent = titleBar
-
-local soekkiLabel = Instance.new("TextLabel")
-soekkiLabel.Size = UDim2.new(1, -50, 1, 0)
-soekkiLabel.Position = UDim2.new(0, 15, 0, 0)
-soekkiLabel.BackgroundTransparency = 1
-soekkiLabel.Text = "SOEKKI"
-soekkiLabel.TextColor3 = COLORS.Accent
-soekkiLabel.TextSize = 14
-soekkiLabel.Font = Enum.Font.GothamBold
-soekkiLabel.TextXAlignment = Enum.TextXAlignment.Right
-soekkiLabel.ZIndex = 1006
-soekkiLabel.Parent = titleBar
-
-local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 24, 0, 24)
-closeButton.Position = UDim2.new(1, -32, 0, 5)
-closeButton.BackgroundColor3 = COLORS.Darker
-closeButton.BackgroundTransparency = 0.5
-closeButton.Text = "✕"
-closeButton.TextColor3 = COLORS.TextDim
-closeButton.TextSize = 14
-closeButton.Font = Enum.Font.GothamBold
-closeButton.BorderSizePixel = 0
-closeButton.ZIndex = 1006
-closeButton.Parent = titleBar
-
-local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 5)
-closeCorner.Parent = closeButton
-
-closeButton.MouseButton1Click:Connect(function()
-	mainFrame.Visible = false
-end)
-
-closeButton.MouseEnter:Connect(function()
-	closeButton.BackgroundColor3 = COLORS.Accent
-	closeButton.BackgroundTransparency = 0.3
-	closeButton.TextColor3 = COLORS.Text
-end)
-
-closeButton.MouseLeave:Connect(function()
-	closeButton.BackgroundColor3 = COLORS.Darker
-	closeButton.BackgroundTransparency = 0.5
-	closeButton.TextColor3 = COLORS.TextDim
-end)
+local pageContainer = Instance.new("Frame")
+pageContainer.Size = UDim2.new(1, 0, 1, -76)
+pageContainer.Position = UDim2.new(0, 0, 0, 76)
+pageContainer.BackgroundTransparency = 1
+pageContainer.Parent = mainFrame
 
 -- ============================================
---   ПЕРЕТАСКИВАНИЕ
+--   СОЗДАНИЕ ВКЛАДОК
 -- ============================================
-local dragging = false
-local dragStart, startPos
-
-titleBar.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		dragging = true
-		dragStart = input.Position
-		startPos = mainFrame.Position
-	end
-end)
-
-titleBar.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		dragging = false
-	end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-		local delta = input.Position - dragStart
-		mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-	end
-end)
-
--- ============================================
---   ОБЛАСТЬ КОНТЕНТА
--- ============================================
-local contentArea = Instance.new("Frame")
-contentArea.Size = UDim2.new(1, -140, 1, -35)
-contentArea.Position = UDim2.new(0, 0, 0, 35)
-contentArea.BackgroundTransparency = 1
-contentArea.BorderSizePixel = 0
-contentArea.ZIndex = 1003
-contentArea.Parent = mainFrame
-
-local contentPadding = Instance.new("UIPadding")
-contentPadding.PaddingTop = UDim.new(0, 15)
-contentPadding.PaddingLeft = UDim.new(0, 15)
-contentPadding.PaddingRight = UDim.new(0, 15)
-contentPadding.PaddingBottom = UDim.new(0, 15)
-contentPadding.Parent = contentArea
-
--- ============================================
---   БОКОВАЯ ПАНЕЛЬ
--- ============================================
-local sidebar = Instance.new("Frame")
-sidebar.Size = UDim2.new(0, 140, 0, 280)
-sidebar.Position = UDim2.new(1, -150, 0.5, -140)
-sidebar.BackgroundColor3 = COLORS.Darker
-sidebar.BackgroundTransparency = 0.2
-sidebar.BorderSizePixel = 0
-sidebar.ZIndex = 1003
-sidebar.Parent = mainFrame
-
-local sidebarCorner = Instance.new("UICorner")
-sidebarCorner.CornerRadius = UDim.new(0, 12)
-sidebarCorner.Parent = sidebar
-
-local sidebarLayout = Instance.new("UIListLayout")
-sidebarLayout.Padding = UDim.new(0, 4)
-sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-sidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
-sidebarLayout.Parent = sidebar
-
-local sidebarPadding = Instance.new("UIPadding")
-sidebarPadding.PaddingTop = UDim.new(0, 12)
-sidebarPadding.PaddingLeft = UDim.new(0, 8)
-sidebarPadding.PaddingRight = UDim.new(0, 8)
-sidebarPadding.PaddingBottom = UDim.new(0, 12)
-sidebarPadding.Parent = sidebar
-
--- ============================================
---   СИСТЕМА ВКЛАДОК
--- ============================================
-local tabs = {}
+local tabNames = { "Visual", "Modification", "Movement", "Combat", "Player", "Misc", "Settings" }
 local tabButtons = {}
-local activeTab = nil
+local tabs = {}
 
-local function createTab(name, icon)
-	local tabBtn = Instance.new("TextButton")
-	tabBtn.Size = UDim2.new(1, 0, 0, 32)
-	tabBtn.BackgroundColor3 = COLORS.TabInactive
-	tabBtn.BackgroundTransparency = 0
-	tabBtn.Text = icon .. "  " .. name
-	tabBtn.TextColor3 = COLORS.TextDim
-	tabBtn.TextSize = 12
-	tabBtn.Font = Enum.Font.Gotham
-	tabBtn.TextXAlignment = Enum.TextXAlignment.Left
-	tabBtn.BorderSizePixel = 0
-	tabBtn.ZIndex = 1004
-	tabBtn.Parent = sidebar
+for i, name in ipairs(tabNames) do
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1 / #tabNames, 0, 1, 0)
+	btn.Position = UDim2.new((i - 1) / #tabNames, 0, 0, 0)
+	btn.BackgroundColor3 = COLORS.TabInactive
+	btn.BorderSizePixel = 0
+	btn.Text = name
+	btn.TextColor3 = COLORS.TextDim
+	btn.TextSize = 12
+	btn.Font = Enum.Font.Gotham
+	btn.Parent = tabBar
+	tabButtons[i] = btn
 
-	local tabBtnCorner = Instance.new("UICorner")
-	tabBtnCorner.CornerRadius = UDim.new(0, 6)
-	tabBtnCorner.Parent = tabBtn
+	local page = Instance.new("ScrollingFrame")
+	page.Size = UDim2.new(1, 0, 1, 0)
+	page.BackgroundColor3 = COLORS.Background
+	page.BorderSizePixel = 0
+	page.ScrollBarThickness = 6
+	page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	page.CanvasSize = UDim2.new(0, 0, 0, 0)
+	page.Visible = false
+	page.Parent = pageContainer
 
-	local tabBtnPadding = Instance.new("UIPadding")
-	tabBtnPadding.PaddingLeft = UDim.new(0, 10)
-	tabBtnPadding.Parent = tabBtn
+	tabs[name] = page
+end
 
-	local contentFrame = Instance.new("ScrollingFrame")
-	contentFrame.Size = UDim2.new(1, 0, 1, 0)
-	contentFrame.BackgroundTransparency = 1
-	contentFrame.BorderSizePixel = 0
-	contentFrame.ScrollBarThickness = 3
-	contentFrame.ScrollBarImageColor3 = COLORS.Accent
-	contentFrame.Visible = false
-	contentFrame.ZIndex = 1004
-	contentFrame.Parent = contentArea
-
-	local function selectTab()
-		for _, btn in pairs(tabButtons) do
-			btn.BackgroundColor3 = COLORS.TabInactive
-			btn.TextColor3 = COLORS.TextDim
-		end
-		for _, frame in pairs(tabs) do
-			frame.Visible = false
-		end
-		tabBtn.BackgroundColor3 = COLORS.TabActive
-		tabBtn.TextColor3 = COLORS.Text
-		contentFrame.Visible = true
-		activeTab = name
+local activeTab = "Visual"
+local function selectTab(name)
+	activeTab = name
+	for i, btn in ipairs(tabButtons) do
+		local isActive = (tabNames[i] == name)
+		btn.BackgroundColor3 = isActive and COLORS.TabActive or COLORS.TabInactive
+		btn.TextColor3 = isActive and COLORS.Text or COLORS.TextDim
+		tabs[tabNames[i]].Visible = isActive
 	end
+end
 
-	tabBtn.MouseButton1Click:Connect(selectTab)
-	tabBtn.MouseEnter:Connect(function()
-		if activeTab ~= name then
-			tabBtn.BackgroundColor3 = COLORS.TabInactive
-			tabBtn.BackgroundTransparency = 0.3
-		end
+for i, btn in ipairs(tabButtons) do
+	btn.MouseButton1Click:Connect(function()
+		selectTab(tabNames[i])
 	end)
-	tabBtn.MouseLeave:Connect(function()
-		if activeTab ~= name then
-			tabBtn.BackgroundColor3 = COLORS.TabInactive
-			tabBtn.BackgroundTransparency = 0
-		end
-	end)
-
-	table.insert(tabButtons, tabBtn)
-	tabs[name] = contentFrame
-
-	return contentFrame
 end
 
 -- ============================================
---   СОЗДАНИЕ TOGGLE
+--   СОЗДАНИЕ ТУМБЛЕРА (с кружком)
 -- ============================================
 local function createToggle(parent, labelText, optionName)
 	local container = Instance.new("Frame")
-	container.Size = UDim2.new(1, 0, 0, 30)
+	container.Size = UDim2.new(1, 0, 0, 40)
 	container.BackgroundTransparency = 1
 	container.Parent = parent
-	
+
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -50, 1, 0)
+	label.Size = UDim2.new(1, -60, 1, 0)
 	label.BackgroundTransparency = 1
 	label.Text = labelText
 	label.TextColor3 = COLORS.Text
@@ -306,7 +133,7 @@ local function createToggle(parent, labelText, optionName)
 	label.Font = Enum.Font.Gotham
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = container
-	
+
 	local toggleBtn = Instance.new("TextButton")
 	toggleBtn.Size = UDim2.new(0, 40, 0, 22)
 	toggleBtn.Position = UDim2.new(1, -45, 0.5, -11)
@@ -314,24 +141,24 @@ local function createToggle(parent, labelText, optionName)
 	toggleBtn.Text = ""
 	toggleBtn.BorderSizePixel = 0
 	toggleBtn.Parent = container
-	
+
 	local toggleCorner = Instance.new("UICorner")
 	toggleCorner.CornerRadius = UDim.new(0, 11)
 	toggleCorner.Parent = toggleBtn
-	
+
 	local toggleDot = Instance.new("Frame")
 	toggleDot.Size = UDim2.new(0, 16, 0, 16)
 	toggleDot.Position = UDim2.new(0, 3, 0.5, -8)
 	toggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
 	toggleDot.BorderSizePixel = 0
 	toggleDot.Parent = toggleBtn
-	
+
 	local dotCorner = Instance.new("UICorner")
 	dotCorner.CornerRadius = UDim.new(0, 8)
 	dotCorner.Parent = toggleDot
-	
+
 	local isOn = false
-	
+
 	local function updateToggle(state)
 		isOn = state
 		if isOn then
@@ -344,16 +171,14 @@ local function createToggle(parent, labelText, optionName)
 			toggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
 		end
 	end
-	
+
 	toggleBtn.MouseButton1Click:Connect(function()
-		local newState = not isOn
-		updateToggle(newState)
-		
-		if _G.ToggleESP then
-			_G.ToggleESP(optionName)
+		updateToggle(not isOn)
+		if _G.SetESPState then
+			_G.SetESPState(optionName, isOn)
 		end
 	end)
-	
+
 	-- Загружаем состояние
 	task.wait(0.1)
 	if _G.GetESPState then
@@ -362,21 +187,21 @@ local function createToggle(parent, labelText, optionName)
 			updateToggle(state)
 		end
 	end
-	
+
 	return updateToggle
 end
 
 -- ============================================
---   СОЗДАНИЕ TOGGLE ДЛЯ БАФФА
+--   ТУМБЛЕР БАФФА ГЕНЕРАТОРОВ
 -- ============================================
 local function createBoostToggle(parent, labelText)
 	local container = Instance.new("Frame")
-	container.Size = UDim2.new(1, 0, 0, 30)
+	container.Size = UDim2.new(1, 0, 0, 40)
 	container.BackgroundTransparency = 1
 	container.Parent = parent
-	
+
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -50, 1, 0)
+	label.Size = UDim2.new(1, -60, 1, 0)
 	label.BackgroundTransparency = 1
 	label.Text = labelText
 	label.TextColor3 = COLORS.Text
@@ -384,7 +209,7 @@ local function createBoostToggle(parent, labelText)
 	label.Font = Enum.Font.Gotham
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = container
-	
+
 	local toggleBtn = Instance.new("TextButton")
 	toggleBtn.Size = UDim2.new(0, 40, 0, 22)
 	toggleBtn.Position = UDim2.new(1, -45, 0.5, -11)
@@ -392,24 +217,24 @@ local function createBoostToggle(parent, labelText)
 	toggleBtn.Text = ""
 	toggleBtn.BorderSizePixel = 0
 	toggleBtn.Parent = container
-	
+
 	local toggleCorner = Instance.new("UICorner")
 	toggleCorner.CornerRadius = UDim.new(0, 11)
 	toggleCorner.Parent = toggleBtn
-	
+
 	local toggleDot = Instance.new("Frame")
 	toggleDot.Size = UDim2.new(0, 16, 0, 16)
 	toggleDot.Position = UDim2.new(0, 3, 0.5, -8)
 	toggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
 	toggleDot.BorderSizePixel = 0
 	toggleDot.Parent = toggleBtn
-	
+
 	local dotCorner = Instance.new("UICorner")
 	dotCorner.CornerRadius = UDim.new(0, 8)
 	dotCorner.Parent = toggleDot
-	
+
 	local isOn = false
-	
+
 	local function updateToggle(state)
 		isOn = state
 		if isOn then
@@ -422,17 +247,14 @@ local function createBoostToggle(parent, labelText)
 			toggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
 		end
 	end
-	
+
 	toggleBtn.MouseButton1Click:Connect(function()
-		local newState = not isOn
-		updateToggle(newState)
-		
+		updateToggle(not isOn)
 		if _G.SetGeneratorBoostEnabled then
-			_G.SetGeneratorBoostEnabled(newState)
+			_G.SetGeneratorBoostEnabled(isOn)
 		end
 	end)
-	
-	-- Загружаем состояние
+
 	task.wait(0.1)
 	if _G.GetGeneratorBoostEnabled then
 		local state = _G.GetGeneratorBoostEnabled()
@@ -440,19 +262,19 @@ local function createBoostToggle(parent, labelText)
 			updateToggle(state)
 		end
 	end
-	
+
 	return updateToggle
 end
 
 -- ============================================
---   СОЗДАНИЕ ПОЛЯ ВВОДА
+--   ПОЛЕ ВВОДА (ПРОЦЕНТ БАФФА)
 -- ============================================
 local function createInput(parent, labelText, getter, setter)
 	local container = Instance.new("Frame")
 	container.Size = UDim2.new(1, 0, 0, 40)
 	container.BackgroundTransparency = 1
 	container.Parent = parent
-	
+
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.new(1, -100, 0, 20)
 	label.BackgroundTransparency = 1
@@ -462,7 +284,7 @@ local function createInput(parent, labelText, getter, setter)
 	label.Font = Enum.Font.Gotham
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = container
-	
+
 	local inputBox = Instance.new("TextBox")
 	inputBox.Size = UDim2.new(0, 80, 0, 28)
 	inputBox.Position = UDim2.new(1, -80, 0, 0)
@@ -475,11 +297,11 @@ local function createInput(parent, labelText, getter, setter)
 	inputBox.TextXAlignment = Enum.TextXAlignment.Center
 	inputBox.PlaceholderText = "0-100"
 	inputBox.Parent = container
-	
+
 	local inputCorner = Instance.new("UICorner")
 	inputCorner.CornerRadius = UDim.new(0, 6)
 	inputCorner.Parent = inputBox
-	
+
 	local suffixLabel = Instance.new("TextLabel")
 	suffixLabel.Size = UDim2.new(0, 15, 0, 20)
 	suffixLabel.Position = UDim2.new(1, 0, 0, 0)
@@ -490,7 +312,7 @@ local function createInput(parent, labelText, getter, setter)
 	suffixLabel.Font = Enum.Font.GothamBold
 	suffixLabel.TextXAlignment = Enum.TextXAlignment.Left
 	suffixLabel.Parent = container
-	
+
 	-- Загружаем начальное значение
 	task.wait(0.1)
 	if getter then
@@ -499,7 +321,7 @@ local function createInput(parent, labelText, getter, setter)
 			inputBox.Text = tostring(math.floor(initialValue))
 		end
 	end
-	
+
 	inputBox.FocusLost:Connect(function(enterPressed)
 		local num = tonumber(inputBox.Text)
 		if num then
@@ -509,7 +331,6 @@ local function createInput(parent, labelText, getter, setter)
 				setter(num)
 			end
 		else
-			-- Если введено не число, возвращаем последнее валидное значение
 			if getter then
 				local currentValue = getter()
 				if currentValue ~= nil then
@@ -520,7 +341,7 @@ local function createInput(parent, labelText, getter, setter)
 			end
 		end
 	end)
-	
+
 	-- Обновляем значение при изменении через другие методы
 	local updateConnection
 	updateConnection = game:GetService("RunService").Heartbeat:Connect(function()
@@ -528,7 +349,6 @@ local function createInput(parent, labelText, getter, setter)
 			if updateConnection then updateConnection:Disconnect() end
 			return
 		end
-		
 		if getter then
 			local currentValue = getter()
 			if currentValue ~= nil then
@@ -539,20 +359,9 @@ local function createInput(parent, labelText, getter, setter)
 			end
 		end
 	end)
-	
+
 	return inputBox
 end
-
--- ============================================
---   СОЗДАНИЕ ВСЕХ ВКЛАДОК
--- ============================================
-createTab("Visual", "👁️")
-createTab("Movement", "🚀")
-createTab("Modification", "🛠️")
-createTab("Combat", "🔪")
-createTab("Player", "👤")
-createTab("Misc", "⚙")
-createTab("Settings", "🔧")
 
 -- ============================================
 --   НАПОЛНЕНИЕ ВКЛАДКИ VISUAL
@@ -560,22 +369,6 @@ createTab("Settings", "🔧")
 local visualTab = tabs["Visual"]
 visualTab.Visible = true
 
-local visualLayout = Instance.new("UIListLayout")
-visualLayout.Padding = UDim.new(0, 4)
-visualLayout.SortOrder = Enum.SortOrder.LayoutOrder
-visualLayout.Parent = visualTab
-
-local visualPadding = Instance.new("UIPadding")
-visualPadding.PaddingTop = UDim.new(0, 5)
-visualPadding.PaddingLeft = UDim.new(0, 5)
-visualPadding.PaddingRight = UDim.new(0, 5)
-visualPadding.PaddingBottom = UDim.new(0, 10)
-visualPadding.Parent = visualTab
-
-visualTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
-visualTab.CanvasSize = UDim2.new(0, 0, 0, 0)
-
--- Заголовок ESP
 local sectionLabel = Instance.new("TextLabel")
 sectionLabel.Size = UDim2.new(1, 0, 0, 25)
 sectionLabel.BackgroundTransparency = 1
@@ -586,33 +379,20 @@ sectionLabel.Font = Enum.Font.GothamBold
 sectionLabel.TextXAlignment = Enum.TextXAlignment.Left
 sectionLabel.Parent = visualTab
 
-local espSpacing = Instance.new("Frame")
-espSpacing.Size = UDim2.new(1, 0, 0, 5)
-espSpacing.BackgroundTransparency = 1
-espSpacing.Parent = visualTab
-
--- ВСЕ КНОПКИ ESP
-createToggle(visualTab, "Generators", "ShowGenerators")
-createToggle(visualTab, "Gates", "ShowGates")
-createToggle(visualTab, "Pallets", "ShowPallets")
-createToggle(visualTab, "Windows", "ShowWindows")
-createToggle(visualTab, "Hooks", "ShowHooks")
-createToggle(visualTab, "Players", "ShowPlayers")
+createToggle(visualTab, "Show Generators", "ShowGenerators")
+createToggle(visualTab, "Show Gates", "ShowGates")
+createToggle(visualTab, "Show Pallets", "ShowPallets")
+createToggle(visualTab, "Show Windows", "ShowWindows")
+createToggle(visualTab, "Show Hooks", "ShowHooks")
+createToggle(visualTab, "Show Players", "ShowPlayers")
 createToggle(visualTab, "Killer Warning", "ShowKillerWarning")
 
--- Разделитель
 local divider = Instance.new("Frame")
 divider.Size = UDim2.new(1, 0, 0, 1)
 divider.BackgroundColor3 = COLORS.Darker
 divider.BackgroundTransparency = 0.5
 divider.Parent = visualTab
 
-local miscSpacing = Instance.new("Frame")
-miscSpacing.Size = UDim2.new(1, 0, 0, 10)
-miscSpacing.BackgroundTransparency = 1
-miscSpacing.Parent = visualTab
-
--- Заголовок Misc
 local sectionLabel2 = Instance.new("TextLabel")
 sectionLabel2.Size = UDim2.new(1, 0, 0, 25)
 sectionLabel2.BackgroundTransparency = 1
@@ -623,11 +403,6 @@ sectionLabel2.Font = Enum.Font.GothamBold
 sectionLabel2.TextXAlignment = Enum.TextXAlignment.Left
 sectionLabel2.Parent = visualTab
 
-local miscSpacing2 = Instance.new("Frame")
-miscSpacing2.Size = UDim2.new(1, 0, 0, 5)
-miscSpacing2.BackgroundTransparency = 1
-miscSpacing2.Parent = visualTab
-
 createToggle(visualTab, "Full Bright", "FullBright")
 
 -- ============================================
@@ -635,48 +410,18 @@ createToggle(visualTab, "Full Bright", "FullBright")
 -- ============================================
 local modTab = tabs["Modification"]
 
-local modLayout = Instance.new("UIListLayout")
-modLayout.Padding = UDim.new(0, 4)
-modLayout.SortOrder = Enum.SortOrder.LayoutOrder
-modLayout.Parent = modTab
+local boostSection = Instance.new("TextLabel")
+boostSection.Size = UDim2.new(1, 0, 0, 25)
+boostSection.BackgroundTransparency = 1
+boostSection.Text = "▶ Repair Boost"
+boostSection.TextColor3 = COLORS.Accent
+boostSection.TextSize = 14
+boostSection.Font = Enum.Font.GothamBold
+boostSection.TextXAlignment = Enum.TextXAlignment.Left
+boostSection.Parent = modTab
 
-local modPadding = Instance.new("UIPadding")
-modPadding.PaddingTop = UDim.new(0, 5)
-modPadding.PaddingLeft = UDim.new(0, 5)
-modPadding.PaddingRight = UDim.new(0, 5)
-modPadding.PaddingBottom = UDim.new(0, 10)
-modPadding.Parent = modTab
+createBoostToggle(modTab, "Boost Enabled")
 
-modTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
-modTab.CanvasSize = UDim2.new(0, 0, 0, 0)
-
--- ============================================
---   РАЗДЕЛ: GENERATOR BOOST
--- ============================================
-local boostTitle = Instance.new("TextLabel")
-boostTitle.Size = UDim2.new(1, 0, 0, 25)
-boostTitle.BackgroundTransparency = 1
-boostTitle.Text = "▶ Generator Boost"
-boostTitle.TextColor3 = COLORS.Accent
-boostTitle.TextSize = 14
-boostTitle.Font = Enum.Font.GothamBold
-boostTitle.TextXAlignment = Enum.TextXAlignment.Left
-boostTitle.Parent = modTab
-
-local boostSpacing = Instance.new("Frame")
-boostSpacing.Size = UDim2.new(1, 0, 0, 5)
-boostSpacing.BackgroundTransparency = 1
-boostSpacing.Parent = modTab
-
--- Toggle для включения баффа
-local boostToggle = createBoostToggle(modTab, "Enable Generator Boost")
-
-local boostSpacing2 = Instance.new("Frame")
-boostSpacing2.Size = UDim2.new(1, 0, 0, 5)
-boostSpacing2.BackgroundTransparency = 1
-boostSpacing2.Parent = modTab
-
--- Поле ввода для процента баффа
 local boostInput = createInput(
 	modTab,
 	"Boost Speed",
@@ -684,156 +429,134 @@ local boostInput = createInput(
 	_G.SetGeneratorBoostPercent
 )
 
-local boostInfoLabel = Instance.new("TextLabel")
-boostInfoLabel.Size = UDim2.new(1, 0, 0, 20)
-boostInfoLabel.BackgroundTransparency = 1
-boostInfoLabel.Text = "0% = no boost | 50% = 1.5x | 100% = 2x speed"
-boostInfoLabel.TextColor3 = COLORS.TextDim
-boostInfoLabel.TextSize = 10
-boostInfoLabel.Font = Enum.Font.Gotham
-boostInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
-boostInfoLabel.Parent = modTab
-
--- Разделитель
-local modDivider = Instance.new("Frame")
-modDivider.Size = UDim2.new(1, 0, 0, 1)
-modDivider.BackgroundColor3 = COLORS.Darker
-modDivider.BackgroundTransparency = 0.5
-modDivider.Parent = modTab
-
-local modSpacing = Instance.new("Frame")
-modSpacing.Size = UDim2.new(1, 0, 0, 10)
-modSpacing.BackgroundTransparency = 1
-modSpacing.Parent = modTab
-
 -- ============================================
---   РАЗДЕЛ: ANIMATIONS
+--   АНИМАЦИИ
 -- ============================================
-local animTitle = Instance.new("TextLabel")
-animTitle.Size = UDim2.new(1, 0, 0, 25)
-animTitle.BackgroundTransparency = 1
-animTitle.Text = "▶ Animations"
-animTitle.TextColor3 = COLORS.Accent
-animTitle.TextSize = 14
-animTitle.Font = Enum.Font.GothamBold
-animTitle.TextXAlignment = Enum.TextXAlignment.Left
-animTitle.Parent = modTab
-
 local animationIds = {
-    walk = "rbxassetid://121364777933025",
-    run = "rbxassetid://88089545021831",
-    crouchIdle = "rbxassetid://73650663675588",
-    crouchWalk = "rbxassetid://137834747905828",
-    injuredIdle = "rbxassetid://137828867671413",
-    injuredWalk = "rbxassetid://136695692860739",
-    injuredSprint = "rbxassetid://79999409695920",
-    injuredCrouchIdle = "rbxassetid://84095653804164",
-    injuredCrouchWalk = "rbxassetid://102450923773041",
-    hit1 = "rbxassetid://104682704142865",
-    hit2 = "rbxassetid://139830743437188",
-    knockedIdle = "rbxassetid://74118390445259",
-    knockedWalk = "rbxassetid://106618106536124",
-    hitFront = "rbxassetid://139830743437188",
-    hitBack = "rbxassetid://121845674088602",
-    heal = "rbxassetid://110392490296814",
-    failheal = "rbxassetid://87055506624885",
-    getheal = "rbxassetid://95836365038528",
-    leveropen = "rbxassetid://123959675151191",
-    leveropeninjured = "rbxassetid://134838390519433",
-    GeneratorPoint1 = "rbxassetid://83160743983246",
-    GeneratorPoint2 = "rbxassetid://92960319113695",
-    GeneratorPoint3 = "rbxassetid://136553272065734",
-    GeneratorPoint4 = "rbxassetid://101968088258360",
+	["walk"] = "rbxassetid://121364777933025",
+	["run"] = "rbxassetid://88089545021831",
+	["crouchIdle"] = "rbxassetid://73650663675588",
+	["crouchWalk"] = "rbxassetid://137834747905828",
+	["injuredIdle"] = "rbxassetid://137828867671413",
+	["injuredWalk"] = "rbxassetid://136695692860739",
+	["injuredSprint"] = "rbxassetid://79999409695920",
+	["injuredCrouchIdle"] = "rbxassetid://84095653804164",
+	["injuredCrouchWalk"] = "rbxassetid://102450923773041",
+	["hit1"] = "rbxassetid://104682704142865",
+	["hit2"] = "rbxassetid://139830743437188",
+	["knockedIdle"] = "rbxassetid://74118390445259",
+	["knockedWalk"] = "rbxassetid://106618106536124",
+	["hitFront"] = "rbxassetid://139830743437188",
+	["hitBack"] = "rbxassetid://121845674088602",
+	["heal"] = "rbxassetid://110392490296814",
+	["failheal"] = "rbxassetid://87055506624885",
+	["getheal"] = "rbxassetid://95836365038528",
+	["leveropen"] = "rbxassetid://123959675151191",
+	["leveropeninjured"] = "rbxassetid://134838390519433",
+	["GeneratorPoint1"] = "rbxassetid://83160743983246",
+	["GeneratorPoint2"] = "rbxassetid://92960319113695",
+	["GeneratorPoint3"] = "rbxassetid://136553272065734",
+	["GeneratorPoint4"] = "rbxassetid://101968088258360",
 }
 
 local activeAnimationTrack = nil
 local activeAnimationObject = nil
 
 local function stopMenuAnimation()
-    if activeAnimationTrack then
-        pcall(function() activeAnimationTrack:Stop(0.05) end)
-        activeAnimationTrack = nil
-    end
-    if activeAnimationObject then
-        activeAnimationObject:Destroy()
-        activeAnimationObject = nil
-    end
+	if activeAnimationTrack then
+		activeAnimationTrack:Stop()
+		activeAnimationTrack = nil
+	end
+	if activeAnimationObject then
+		activeAnimationObject:Destroy()
+		activeAnimationObject = nil
+	end
 end
 
 local function playMenuAnimation(animationName)
-    local animationId = animationIds[animationName]
-    if not animationId then return end
+	local animationId = animationIds[animationName]
+	if not animationId then return end
 
-    local character = player.Character
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
 
-    local animator = humanoid:FindFirstChildOfClass("Animator")
-    if not animator then
-        animator = Instance.new("Animator")
-        animator.Parent = humanoid
-    end
+	local animator = humanoid:FindFirstChildOfClass("Animator")
+	if not animator then
+		animator = Instance.new("Animator")
+		animator.Parent = humanoid
+	end
 
-    stopMenuAnimation()
+	stopMenuAnimation()
 
-    local animation = Instance.new("Animation")
-    animation.Name = "ViolenceMenu_" .. animationName
-    animation.AnimationId = animationId
+	local animation = Instance.new("Animation")
+	animation.Name = "ViolenceMenu_" .. animationName
+	animation.AnimationId = animationId
 
-    local ok, track = pcall(function()
-        return animator:LoadAnimation(animation)
-    end)
+	local ok, track = pcall(function()
+		return animator:LoadAnimation(animation)
+	end)
 
-    if not ok or not track then
-        animation:Destroy()
-        return
-    end
+	if not ok or not track then
+		animation:Destroy()
+		return
+	end
 
-    activeAnimationObject = animation
-    activeAnimationTrack = track
-    track.Priority = Enum.AnimationPriority.Action
-    track.Looped = true
-    track:Play(0.1, 1, 1)
+	activeAnimationObject = animation
+	activeAnimationTrack = track
+	track.Priority = Enum.AnimationPriority.Action
+	track.Looped = true
+	track:Play(0.1, 1, 1)
 end
 
 local function createAnimationButton(parent, name)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, 0, 0, 30)
-    button.BackgroundColor3 = COLORS.Darker
-    button.BackgroundTransparency = 0.15
-    button.BorderSizePixel = 0
-    button.Text = name
-    button.TextColor3 = COLORS.Text
-    button.TextSize = 13
-    button.Font = Enum.Font.Gotham
-    button.TextXAlignment = Enum.TextXAlignment.Left
-    button.Parent = parent
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, 0, 0, 30)
+	button.BackgroundColor3 = COLORS.Darker
+	button.BackgroundTransparency = 0.15
+	button.BorderSizePixel = 0
+	button.Text = name
+	button.TextColor3 = COLORS.Text
+	button.TextSize = 13
+	button.Font = Enum.Font.Gotham
+	button.TextXAlignment = Enum.TextXAlignment.Left
+	button.Parent = parent
 
-    local padding = Instance.new("UIPadding")
-    padding.PaddingLeft = UDim.new(0, 10)
-    padding.Parent = button
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = UDim.new(0, 10)
+	padding.Parent = button
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = button
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = button
 
-    button.MouseButton1Click:Connect(function()
-        playMenuAnimation(name)
-    end)
+	button.MouseButton1Click:Connect(function()
+		playMenuAnimation(name)
+	end)
 end
 
+local animSection = Instance.new("TextLabel")
+animSection.Size = UDim2.new(1, 0, 0, 25)
+animSection.BackgroundTransparency = 1
+animSection.Text = "▶ Animations"
+animSection.TextColor3 = COLORS.Accent
+animSection.TextSize = 14
+animSection.Font = Enum.Font.GothamBold
+animSection.TextXAlignment = Enum.TextXAlignment.Left
+animSection.Parent = modTab
+
 local animationOrder = {
-    "walk", "run", "crouchIdle", "crouchWalk",
-    "injuredIdle", "injuredWalk", "injuredSprint",
-    "injuredCrouchIdle", "injuredCrouchWalk",
-    "hit1", "hit2", "knockedIdle", "knockedWalk",
-    "hitFront", "hitBack", "heal", "failheal", "getheal",
-    "leveropen", "leveropeninjured",
-    "GeneratorPoint1", "GeneratorPoint2", "GeneratorPoint3", "GeneratorPoint4"
+	"walk", "run", "crouchIdle", "crouchWalk",
+	"injuredIdle", "injuredWalk", "injuredSprint",
+	"injuredCrouchIdle", "injuredCrouchWalk",
+	"hit1", "hit2", "knockedIdle", "knockedWalk",
+	"hitFront", "hitBack", "heal", "failheal", "getheal",
+	"leveropen", "leveropeninjured",
+	"GeneratorPoint1", "GeneratorPoint2", "GeneratorPoint3", "GeneratorPoint4"
 }
 
 for _, animationName in ipairs(animationOrder) do
-    createAnimationButton(modTab, animationName)
+	createAnimationButton(modTab, animationName)
 end
 
 local stopAnimationButton = Instance.new("TextButton")
@@ -853,71 +576,30 @@ stopCorner.Parent = stopAnimationButton
 stopAnimationButton.MouseButton1Click:Connect(stopMenuAnimation)
 
 player.CharacterAdded:Connect(function()
-    stopMenuAnimation()
+	stopMenuAnimation()
 end)
 
 -- ============================================
---   ДРУГИЕ ВКЛАДКИ (ПУСТЫЕ)
+--   ДРУГИЕ ВКЛАДКИ (ЗАГЛУШКИ)
 -- ============================================
--- Movement
-local movementTab = tabs["Movement"]
-local movLabel = Instance.new("TextLabel")
-movLabel.Size = UDim2.new(1, 0, 0, 30)
-movLabel.BackgroundTransparency = 1
-movLabel.Text = "🚀 Movement options coming soon..."
-movLabel.TextColor3 = COLORS.TextDim
-movLabel.TextSize = 14
-movLabel.Font = Enum.Font.Gotham
-movLabel.TextXAlignment = Enum.TextXAlignment.Center
-movLabel.Parent = movementTab
+local function createPlaceholder(tabName, text)
+	local page = tabs[tabName]
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 0, 30)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.TextColor3 = COLORS.TextDim
+	label.TextSize = 14
+	label.Font = Enum.Font.Gotham
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.Parent = page
+end
 
--- Combat
-local combatTab = tabs["Combat"]
-local combatLabel = Instance.new("TextLabel")
-combatLabel.Size = UDim2.new(1, 0, 0, 30)
-combatLabel.BackgroundTransparency = 1
-combatLabel.Text = "🔪 Combat options coming soon..."
-combatLabel.TextColor3 = COLORS.TextDim
-combatLabel.TextSize = 14
-combatLabel.Font = Enum.Font.Gotham
-combatLabel.TextXAlignment = Enum.TextXAlignment.Center
-combatLabel.Parent = combatTab
-
--- Player
-local playerTab = tabs["Player"]
-local playerLabel = Instance.new("TextLabel")
-playerLabel.Size = UDim2.new(1, 0, 0, 30)
-playerLabel.BackgroundTransparency = 1
-playerLabel.Text = "👤 Player options coming soon..."
-playerLabel.TextColor3 = COLORS.TextDim
-playerLabel.TextSize = 14
-playerLabel.Font = Enum.Font.Gotham
-playerLabel.TextXAlignment = Enum.TextXAlignment.Center
-playerLabel.Parent = playerTab
-
--- Misc
-local miscTab = tabs["Misc"]
-local miscLabel = Instance.new("TextLabel")
-miscLabel.Size = UDim2.new(1, 0, 0, 30)
-miscLabel.BackgroundTransparency = 1
-miscLabel.Text = "⚙ Misc options coming soon..."
-miscLabel.TextColor3 = COLORS.TextDim
-miscLabel.TextSize = 14
-miscLabel.Font = Enum.Font.Gotham
-miscLabel.TextXAlignment = Enum.TextXAlignment.Center
-miscLabel.Parent = miscTab
-
--- Settings
-local settingsTab = tabs["Settings"]
-local settingsLabel = Instance.new("TextLabel")
-settingsLabel.Size = UDim2.new(1, 0, 0, 30)
-settingsLabel.BackgroundTransparency = 1
-settingsLabel.Text = "🔧 Settings options coming soon..."
-settingsLabel.TextColor3 = COLORS.TextDim
-settingsLabel.TextSize = 14
-settingsLabel.Font = Enum.Font.Gotham
-settingsLabel.TextXAlignment = Enum.TextXAlignment.Center
-settingsLabel.Parent = settingsTab
+createPlaceholder("Movement", "🚀 Movement options coming soon...")
+createPlaceholder("Combat", "🔪 Combat options coming soon...")
+createPlaceholder("Player", "👤 Player options coming soon...")
+createPlaceholder("Misc", "⚙ Misc options coming soon...")
+createPlaceholder("Settings", "🔧 Settings options coming soon...")
 
 -- ============================================
 --   АКТИВАЦИЯ ПЕРВОЙ ВКЛАДКИ
