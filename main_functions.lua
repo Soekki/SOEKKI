@@ -7,16 +7,103 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- ============================================
---   MODIFICATION: AUTO PERFECT SKILL CHECK
+--   ANIMATIONS
 -- ============================================
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local ModificationConfig = {
-    AutoPerfect = false,
+-- IDs взяты из SurvivorAnimationsController.
+-- Управление проигрыванием доступно из Modification -> Animations.
+local AnimationConfig = {
+    walk = "rbxassetid://121364777933025",
+    run = "rbxassetid://88089545021831",
+    crouchIdle = "rbxassetid://73650663675588",
+    crouchWalk = "rbxassetid://137834747905828",
+    injuredIdle = "rbxassetid://137828867671413",
+    injuredWalk = "rbxassetid://136695692860739",
+    injuredSprint = "rbxassetid://79999409695920",
+    injuredCrouchIdle = "rbxassetid://84095653804164",
+    injuredCrouchWalk = "rbxassetid://102450923773041",
+    hit1 = "rbxassetid://104682704142865",
+    hit2 = "rbxassetid://139830743437188",
+    knockedIdle = "rbxassetid://74118390445259",
+    knockedWalk = "rbxassetid://106618106536124",
+    hitFront = "rbxassetid://139830743437188",
+    hitBack = "rbxassetid://121845674088602",
+    heal = "rbxassetid://110392490296814",
+    failheal = "rbxassetid://87055506624885",
+    getheal = "rbxassetid://95836365038528",
+    leveropen = "rbxassetid://123959675151191",
+    leveropeninjured = "rbxassetid://134838390519433",
+    GeneratorPoint1 = "rbxassetid://83160743983246",
+    GeneratorPoint2 = "rbxassetid://92960319113695",
+    GeneratorPoint3 = "rbxassetid://136553272065734",
+    GeneratorPoint4 = "rbxassetid://101968088258360",
+    skillCheckFail = "rbxassetid://83511010475014",
 }
 
--- Флаг читается модифицированной логикой skillcheck_gen.
-_G.AutoPerfectSkillCheck = false
+local ActiveCustomAnimation = nil
+local ActiveCustomAnimationCharacter = nil
+
+local function StopCustomAnimation()
+    if ActiveCustomAnimation then
+        pcall(function()
+            ActiveCustomAnimation:Stop(0.1)
+            ActiveCustomAnimation:Destroy()
+        end)
+        ActiveCustomAnimation = nil
+    end
+end
+
+local function PlayCustomAnimation(name)
+    local animationId = AnimationConfig[name]
+    if not animationId then
+        return false, "Animation not found"
+    end
+
+    local character = LocalPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then
+        return false, "Humanoid not found"
+    end
+
+    local animator = humanoid:FindFirstChildOfClass("Animator")
+    if not animator then
+        animator = Instance.new("Animator")
+        animator.Parent = humanoid
+    end
+
+    StopCustomAnimation()
+
+    local animation = Instance.new("Animation")
+    animation.Name = "SOEKKI_" .. name
+    animation.AnimationId = animationId
+
+    local ok, track = pcall(function()
+        return animator:LoadAnimation(animation)
+    end)
+
+    if not ok or not track then
+        animation:Destroy()
+        return false, "Failed to load animation"
+    end
+
+    track.Priority = Enum.AnimationPriority.Action
+    track.Looped = false
+    track:Play(0.1)
+
+    ActiveCustomAnimation = track
+    ActiveCustomAnimationCharacter = character
+
+    task.spawn(function()
+        local current = track
+        current.Stopped:Wait()
+        if ActiveCustomAnimation == current then
+            ActiveCustomAnimation = nil
+            ActiveCustomAnimationCharacter = nil
+        end
+        pcall(function() animation:Destroy() end)
+    end)
+
+    return true
+end
 
 -- ============================================
 --   НАСТРОЙКИ ESP (КАЖДАЯ ОТДЕЛЬНО)
@@ -482,30 +569,35 @@ end
 -- ============================================
 local module = {}
 
-function module.GetModificationState(option)
-    return ModificationConfig[option]
+local AnimationOrder = {
+    "walk", "run", "crouchIdle", "crouchWalk",
+    "injuredIdle", "injuredWalk", "injuredSprint",
+    "injuredCrouchIdle", "injuredCrouchWalk",
+    "hit1", "hit2", "knockedIdle", "knockedWalk",
+    "hitFront", "hitBack", "heal", "failheal", "getheal",
+    "leveropen", "leveropeninjured",
+    "GeneratorPoint1", "GeneratorPoint2", "GeneratorPoint3", "GeneratorPoint4",
+    "skillCheckFail"
+}
+
+function module.GetAnimationList()
+    local result = {}
+    for _, name in ipairs(AnimationOrder) do
+        local animationId = AnimationConfig[name]
+        if animationId then
+            table.insert(result, {Name = name, Id = animationId})
+        end
+    end
+    return result
 end
 
-function module.SetModificationState(option, state)
-    if ModificationConfig[option] == nil then
-        return nil
-    end
-
-    ModificationConfig[option] = state == true
-
-    if option == "AutoPerfect" then
-        _G.AutoPerfectSkillCheck = ModificationConfig.AutoPerfect
-    end
-
-    return ModificationConfig[option]
+function module.PlayAnimation(name)
+    return PlayCustomAnimation(name)
 end
 
-function module.ToggleModification(option)
-    if ModificationConfig[option] == nil then
-        return nil
-    end
-
-    return module.SetModificationState(option, not ModificationConfig[option])
+function module.StopAnimation()
+    StopCustomAnimation()
+    return true
 end
 
 function module.ToggleESP(option)
@@ -541,6 +633,7 @@ workspace.ChildAdded:Connect(function(c)
 end)
 
 LocalPlayer.CharacterAdded:Connect(function()
+    StopCustomAnimation()
     SetupGui()
     task.wait(1)
 end)
@@ -625,13 +718,13 @@ SetupGui()
 RefreshESP()
 
 -- Регистрируем в глобальном пространстве
+_G.PlayAnimation = module.PlayAnimation
+_G.StopAnimation = module.StopAnimation
+_G.GetAnimationList = module.GetAnimationList
 _G.ESPModule = module
 _G.ToggleESP = module.ToggleESP
 _G.GetESPState = module.GetESPState
 _G.SetESPState = module.SetESPState
-_G.GetModificationState = module.GetModificationState
-_G.SetModificationState = module.SetModificationState
-_G.ToggleModification = module.ToggleModification
 
 print("[SOEKKI] Functions loaded!")
 

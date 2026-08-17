@@ -475,97 +475,97 @@ modLayout.Padding = UDim.new(0, 6)
 modLayout.SortOrder = Enum.SortOrder.LayoutOrder
 modLayout.Parent = modTab
 
-createSectionTitle(modTab, "▶ Skill Check", 1)
+createSectionTitle(modTab, "▶ Animations", 1)
 
-local function createModificationToggle(parent, labelText, optionName, layoutOrder)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, 0, 0, 34)
-    container.BackgroundTransparency = 1
-    container.LayoutOrder = layoutOrder or 0
-    container.Parent = parent
+local animationList = {}
+if _G.GetAnimationList then
+    animationList = _G.GetAnimationList()
+end
 
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -60, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = labelText
-    label.TextColor3 = COLORS.Text
-    label.TextSize = 13
-    label.Font = Enum.Font.Gotham
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = container
+local function createAnimationButton(parent, displayName, animationId, layoutOrder)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 40)
+    button.BackgroundColor3 = COLORS.Darker
+    button.BackgroundTransparency = 0.15
+    button.Text = ""
+    button.AutoButtonColor = false
+    button.BorderSizePixel = 0
+    button.LayoutOrder = layoutOrder
+    button.Parent = parent
 
-    local toggleBtn = Instance.new("TextButton")
-    toggleBtn.Size = UDim2.new(0, 42, 0, 22)
-    toggleBtn.Position = UDim2.new(1, -42, 0.5, -11)
-    toggleBtn.BackgroundColor3 = COLORS.ToggleOff
-    toggleBtn.Text = ""
-    toggleBtn.AutoButtonColor = false
-    toggleBtn.BorderSizePixel = 0
-    toggleBtn.Parent = container
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = button
 
-    local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 11)
-    toggleCorner.Parent = toggleBtn
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, -16, 0, 21)
+    nameLabel.Position = UDim2.new(0, 8, 0, 2)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = displayName
+    nameLabel.TextColor3 = COLORS.Text
+    nameLabel.TextSize = 12
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Parent = button
 
-    local toggleDot = Instance.new("Frame")
-    toggleDot.Size = UDim2.new(0, 16, 0, 16)
-    toggleDot.Position = UDim2.new(0, 3, 0.5, -8)
-    toggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-    toggleDot.BorderSizePixel = 0
-    toggleDot.Parent = toggleBtn
+    local idLabel = Instance.new("TextLabel")
+    idLabel.Size = UDim2.new(1, -16, 0, 14)
+    idLabel.Position = UDim2.new(0, 8, 0, 22)
+    idLabel.BackgroundTransparency = 1
+    idLabel.Text = animationId
+    idLabel.TextColor3 = COLORS.TextDim
+    idLabel.TextSize = 9
+    idLabel.Font = Enum.Font.Gotham
+    idLabel.TextXAlignment = Enum.TextXAlignment.Left
+    idLabel.Parent = button
 
-    local dotCorner = Instance.new("UICorner")
-    dotCorner.CornerRadius = UDim.new(0, 8)
-    dotCorner.Parent = toggleDot
-
-    local isOn = false
-
-    local function updateToggle(state)
-        isOn = state == true
-        if isOn then
-            toggleBtn.BackgroundColor3 = COLORS.ToggleOn
-            toggleDot.Position = UDim2.new(0, 23, 0.5, -8)
-            toggleDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        else
-            toggleBtn.BackgroundColor3 = COLORS.ToggleOff
-            toggleDot.Position = UDim2.new(0, 3, 0.5, -8)
-            toggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-        end
-    end
-
-    toggleBtn.MouseButton1Click:Connect(function()
-        local newState = not isOn
-        if _G.SetModificationState then
-            local result = _G.SetModificationState(optionName, newState)
-            updateToggle(result)
-        else
-            updateToggle(newState)
-        end
-    end)
-
-    task.defer(function()
-        if _G.GetModificationState then
-            local state = _G.GetModificationState(optionName)
-            if state ~= nil then
-                updateToggle(state)
+    button.MouseButton1Click:Connect(function()
+        if _G.PlayAnimation then
+            local ok = _G.PlayAnimation(displayName)
+            if ok then
+                button.BackgroundColor3 = COLORS.ToggleOn
+                task.delay(0.15, function()
+                    if button and button.Parent then
+                        button.BackgroundColor3 = COLORS.Darker
+                    end
+                end)
             end
         end
     end)
+
+    button.MouseEnter:Connect(function()
+        button.BackgroundColor3 = COLORS.TabActive
+    end)
+
+    button.MouseLeave:Connect(function()
+        button.BackgroundColor3 = COLORS.Darker
+    end)
 end
 
-createModificationToggle(modTab, "Auto Perfect Skill Check", "AutoPerfect", 10)
+for index, info in ipairs(animationList) do
+    createAnimationButton(modTab, info.Name, info.Id, 10 + index)
+end
 
-local modInfo = Instance.new("TextLabel")
-modInfo.Size = UDim2.new(1, 0, 0, 42)
-modInfo.BackgroundTransparency = 1
-modInfo.Text = "Automatically hits the Perfect zone during generator skill checks."
-modInfo.TextColor3 = COLORS.TextDim
-modInfo.TextSize = 11
-modInfo.Font = Enum.Font.Gotham
-modInfo.TextWrapped = true
-modInfo.TextXAlignment = Enum.TextXAlignment.Left
-modInfo.LayoutOrder = 11
-modInfo.Parent = modTab
+local stopButton = Instance.new("TextButton")
+stopButton.Size = UDim2.new(1, 0, 0, 34)
+stopButton.BackgroundColor3 = COLORS.ToggleOff
+stopButton.Text = "■  Stop Animation"
+stopButton.TextColor3 = COLORS.Text
+stopButton.TextSize = 12
+stopButton.Font = Enum.Font.GothamBold
+stopButton.BorderSizePixel = 0
+stopButton.LayoutOrder = 100
+stopButton.Parent = modTab
+
+local stopCorner = Instance.new("UICorner")
+stopCorner.CornerRadius = UDim.new(0, 6)
+stopCorner.Parent = stopButton
+
+stopButton.MouseButton1Click:Connect(function()
+    if _G.StopAnimation then
+        _G.StopAnimation()
+    end
+end)
 
 -- Combat
 local combatTab = tabs["Combat"]
