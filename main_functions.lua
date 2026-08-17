@@ -1,4 +1,4 @@
--- main_functions.lua - УПРОЩЕННАЯ ВЕРСИЯ С БАФФОМ ГЕНЕРАТОРОВ
+-- main_functions.lua - ИСПРАВЛЕННАЯ ВЕРСИЯ
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
@@ -73,10 +73,9 @@ local LastFullESPRefresh = 0
 local IndicatorGui = nil
 
 -- ============================================
---   СИСТЕМА БАФФА ГЕНЕРАТОРОВ (УПРОЩЕННАЯ)
+--   СИСТЕМА БАФФА ГЕНЕРАТОРОВ (ИСПРАВЛЕННАЯ)
 -- ============================================
 local activeGeneratorBoosts = {}
-local generatorBoostConnections = {}
 
 -- Функция для применения баффа
 local function applyGeneratorBoost(generator)
@@ -113,9 +112,11 @@ local function applyGeneratorBoost(generator)
     
     -- Устанавливаем атрибут на все цели
     for _, target in ipairs(targets) do
-        target:SetAttribute("BoostMultiplier", boostMultiplier)
-        target:SetAttribute("RepairBoost", boostMultiplier)
-        target:SetAttribute("GeneratorBoost", boostMultiplier)
+        pcall(function()
+            target:SetAttribute("BoostMultiplier", boostMultiplier)
+            target:SetAttribute("RepairBoost", boostMultiplier)
+            target:SetAttribute("GeneratorBoost", boostMultiplier)
+        end)
     end
     
     print("[SOEKKI] ✅ Бафф применен к:", generator.Name, "x" .. string.format("%.2f", boostMultiplier))
@@ -139,12 +140,79 @@ local function removeGeneratorBoost(generator)
         end
         
         for _, target in ipairs(targets) do
-            target:SetAttribute("BoostMultiplier", nil)
-            target:SetAttribute("RepairBoost", nil)
-            target:SetAttribute("GeneratorBoost", nil)
+            pcall(function()
+                target:SetAttribute("BoostMultiplier", nil)
+                target:SetAttribute("RepairBoost", nil)
+                target:SetAttribute("GeneratorBoost", nil)
+            end)
         end
         
         print("[SOEKKI] ❌ Бафф снят с:", generator.Name)
+    end
+end
+
+-- Функция для поиска генератора по точке ремонта
+local function findGeneratorFromRepairPoint(repairPoint)
+    if not repairPoint then return nil end
+    
+    -- Если repairPoint - это объект
+    if type(repairPoint) == "table" and repairPoint.Parent then
+        -- Проверяем, является ли repairPoint частью генератора
+        local parent = repairPoint.Parent
+        if parent then
+            -- Проверяем сам родитель
+            if CollectionService:HasTag(parent, "Generator") then
+                return parent
+            end
+            -- Проверяем дочерние элементы родителя
+            for _, child in ipairs(parent:GetDescendants()) do
+                if CollectionService:HasTag(child, "Generator") then
+                    return child
+                end
+            end
+            -- Проверяем, является ли сам repairPoint генератором
+            if CollectionService:HasTag(repairPoint, "Generator") then
+                return repairPoint
+            end
+            -- Проверяем имя
+            if parent.Name == "Generator" then
+                return parent
+            end
+        end
+    end
+    
+    return nil
+end
+
+-- БЕЗОПАСНАЯ функция обработки ремонта (без ошибок)
+local function handleRepairAnim(...)
+    local args = {...}
+    
+    -- Проверяем каждый аргумент
+    local repairPoint = nil
+    local isRepairing = false
+    
+    for i, arg in ipairs(args) do
+        -- Если это объект с Parent
+        if type(arg) == "table" and arg.Parent and type(arg.Parent) == "table" then
+            repairPoint = arg
+        end
+        -- Если это булево значение (isRepairing)
+        if type(arg) == "boolean" then
+            isRepairing = arg
+        end
+    end
+    
+    -- Если нашли repairPoint, ищем генератор
+    if repairPoint then
+        local generator = findGeneratorFromRepairPoint(repairPoint)
+        if generator then
+            if isRepairing and GeneratorBoostConfig.Enabled then
+                applyGeneratorBoost(generator)
+            elseif not isRepairing then
+                removeGeneratorBoost(generator)
+            end
+        end
     end
 end
 
@@ -163,18 +231,18 @@ local function monitorGeneratorsLoop()
         
         -- Получаем все генераторы
         local allGenerators = CollectionService:GetTagged("Generator")
-        local activeGenerators = {}
         
         for _, generator in ipairs(allGenerators) do
             if generator:IsDescendantOf(workspace) then
-                -- Проверяем, чинится ли генератор
-                local isBeingRepaired = generator:GetAttribute("IsBeingRepaired") or false
-                local repairProgress = generator:GetAttribute("RepairProgress") or 0
+                -- Проверяем, чинится ли генератор через атрибуты
+                local isBeingRepaired = pcall(function() return generator:GetAttribute("IsBeingRepaired") or false end)
+                if type(isBeingRepaired) == "table" then isBeingRepaired = false end
+                
+                local repairProgress = pcall(function() return generator:GetAttribute("RepairProgress") or 0 end)
+                if type(repairProgress) == "table" then repairProgress = 0 end
                 
                 -- Если генератор чинится и не закончен
                 if isBeingRepaired and repairProgress < 100 then
-                    table.insert(activeGenerators, generator)
-                    
                     -- Применяем бафф
                     local boostPercent = GeneratorBoostConfig.BoostPercent / 100
                     local boostMultiplier = 1 + boostPercent
@@ -192,8 +260,12 @@ local function monitorGeneratorsLoop()
         -- Проверяем, не закончился ли ремонт у генераторов с баффом
         for gen, _ in pairs(activeGeneratorBoosts) do
             if gen and gen.Parent then
-                local isBeingRepaired = gen:GetAttribute("IsBeingRepaired") or false
-                local repairProgress = gen:GetAttribute("RepairProgress") or 0
+                local isBeingRepaired = pcall(function() return gen:GetAttribute("IsBeingRepaired") or false end)
+                if type(isBeingRepaired) == "table" then isBeingRepaired = false end
+                
+                local repairProgress = pcall(function() return gen:GetAttribute("RepairProgress") or 0 end)
+                if type(repairProgress) == "table" then repairProgress = 0 end
+                
                 if not isBeingRepaired or repairProgress >= 100 then
                     removeGeneratorBoost(gen)
                 end
@@ -209,49 +281,39 @@ end
 -- Запускаем мониторинг
 task.spawn(monitorGeneratorsLoop)
 
--- Подключаемся к событиям ремонта (если есть)
+-- БЕЗОПАСНО подключаемся к событиям ремонта
 local function setupRemoteListeners()
-    local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    if not Remotes then 
+    local success, Remotes = pcall(function() return ReplicatedStorage:FindFirstChild("Remotes") end)
+    if not success or not Remotes then 
         print("[SOEKKI] Remotes не найдены")
         return 
     end
     
-    local Generator = Remotes:FindFirstChild("Generator")
-    if not Generator then 
+    local success2, Generator = pcall(function() return Remotes:FindFirstChild("Generator") end)
+    if not success2 or not Generator then 
         print("[SOEKKI] Generator ремоуты не найдены")
         return 
     end
     
-    -- RepairAnim
+    -- RepairAnim - с защитой от ошибок
     local RepairAnim = Generator:FindFirstChild("RepairAnim")
     if RepairAnim then
-        RepairAnim.OnClientEvent:Connect(function(repairPoint, isRepairing, ...)
-            if not repairPoint then return end
-            local generator = repairPoint.Parent
-            if not generator then return end
-            
-            if isRepairing and GeneratorBoostConfig.Enabled then
-                applyGeneratorBoost(generator)
-            elseif not isRepairing then
-                removeGeneratorBoost(generator)
+        RepairAnim.OnClientEvent:Connect(function(...)
+            local success, err = pcall(handleRepairAnim, ...)
+            if not success then
+                -- print("[SOEKKI] Ошибка в RepairAnim:", err)
             end
         end)
         print("[SOEKKI] ✅ Подключен RepairAnim")
     end
     
-    -- RepairEvent
+    -- RepairEvent - с защитой от ошибок
     local RepairEvent = Generator:FindFirstChild("RepairEvent")
     if RepairEvent then
-        RepairEvent.OnClientEvent:Connect(function(repairPoint, isRepairing)
-            if not repairPoint then return end
-            local generator = repairPoint.Parent
-            if not generator then return end
-            
-            if isRepairing and GeneratorBoostConfig.Enabled then
-                applyGeneratorBoost(generator)
-            elseif not isRepairing then
-                removeGeneratorBoost(generator)
+        RepairEvent.OnClientEvent:Connect(function(...)
+            local success, err = pcall(handleRepairAnim, ...)
+            if not success then
+                -- print("[SOEKKI] Ошибка в RepairEvent:", err)
             end
         end)
         print("[SOEKKI] ✅ Подключен RepairEvent")
@@ -295,6 +357,7 @@ end
 --   ФУНКЦИЯ ПОДСВЕТКИ
 -- ============================================
 local function ApplyHighlight(object, color)
+    if not object then return end
     local h = object:FindFirstChild("H") or Instance.new("Highlight")
     h.Name = "H"
     h.Adornee = object
@@ -307,6 +370,7 @@ local function ApplyHighlight(object, color)
 end
 
 local function RemoveHighlight(object)
+    if not object then return end
     local h = object:FindFirstChild("H")
     if h then h:Destroy() end
 end
