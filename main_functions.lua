@@ -1,4 +1,4 @@
--- main_functions.lua - ИСПРАВЛЕННАЯ ВЕРСИЯ С repairboost
+-- main_functions.lua - РАБОЧАЯ ВЕРСИЯ С PlayersRepairingCount
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
@@ -73,7 +73,7 @@ local LastFullESPRefresh = 0
 local IndicatorGui = nil
 
 -- ============================================
---   СИСТЕМА БАФФА ГЕНЕРАТОРОВ (ИСПРАВЛЕННАЯ)
+--   СИСТЕМА БАФФА ГЕНЕРАТОРОВ (РАБОЧАЯ)
 -- ============================================
 local activeGeneratorBoosts = {}
 
@@ -87,22 +87,23 @@ local function applyGeneratorBoost(generator)
     
     -- Проверяем, есть ли уже активный бафф
     if activeGeneratorBoosts[generator] then
-        if activeGeneratorBoosts[generator] == boostMultiplier then
+        if math.abs(activeGeneratorBoosts[generator] - boostMultiplier) < 0.01 then
             return
         end
     end
     
     activeGeneratorBoosts[generator] = boostMultiplier
     
-    -- Устанавливаем атрибуты на генератор (главный способ)
+    -- Устанавливаем атрибуты на генератор
     pcall(function()
         generator:SetAttribute("repairboost", boostMultiplier)
         generator:SetAttribute("BoostMultiplier", boostMultiplier)
         generator:SetAttribute("RepairBoost", boostMultiplier)
         generator:SetAttribute("GeneratorBoost", boostMultiplier)
+        generator:SetAttribute("SpeedMultiplier", boostMultiplier)
     end)
     
-    -- Также устанавливаем на все части генератора
+    -- На все части
     for _, part in ipairs(generator:GetDescendants()) do
         if part:IsA("BasePart") then
             pcall(function()
@@ -117,6 +118,7 @@ local function applyGeneratorBoost(generator)
     if repairPoint then
         pcall(function()
             repairPoint:SetAttribute("repairboost", boostMultiplier)
+            repairPoint:SetAttribute("BoostMultiplier", boostMultiplier)
         end)
     end
     
@@ -135,6 +137,7 @@ local function removeGeneratorBoost(generator)
             generator:SetAttribute("BoostMultiplier", nil)
             generator:SetAttribute("RepairBoost", nil)
             generator:SetAttribute("GeneratorBoost", nil)
+            generator:SetAttribute("SpeedMultiplier", nil)
         end)
         
         for _, part in ipairs(generator:GetDescendants()) do
@@ -150,6 +153,7 @@ local function removeGeneratorBoost(generator)
         if repairPoint then
             pcall(function()
                 repairPoint:SetAttribute("repairboost", nil)
+                repairPoint:SetAttribute("BoostMultiplier", nil)
             end)
         end
         
@@ -157,7 +161,7 @@ local function removeGeneratorBoost(generator)
     end
 end
 
--- Главная функция мониторинга (ИСПРАВЛЕННАЯ)
+-- ГЛАВНАЯ ФУНКЦИЯ - работает через PlayersRepairingCount
 local function monitorGeneratorsLoop()
     while true do
         -- Если бафф выключен - чистим всё
@@ -175,24 +179,26 @@ local function monitorGeneratorsLoop()
         
         for _, generator in ipairs(allGenerators) do
             if generator and generator:IsDescendantOf(workspace) then
-                -- БЕЗОПАСНО получаем атрибуты
-                local isBeingRepaired = false
-                local repairProgress = 0
-                
+                -- Получаем количество игроков, чинящих генератор
+                local playersRepairing = 0
                 pcall(function()
-                    local attr = generator:GetAttribute("IsBeingRepaired")
-                    if attr ~= nil then
-                        isBeingRepaired = attr == true
+                    local count = generator:GetAttribute("PlayersRepairingCount")
+                    if count ~= nil and type(count) == "number" then
+                        playersRepairing = count
                     end
-                    
+                end)
+                
+                -- Получаем прогресс
+                local repairProgress = 0
+                pcall(function()
                     local progress = generator:GetAttribute("RepairProgress")
                     if progress ~= nil and type(progress) == "number" then
                         repairProgress = progress
                     end
                 end)
                 
-                -- Если генератор чинится и не закончен
-                if isBeingRepaired and repairProgress < 100 then
+                -- Если генератор чинится (PlayersRepairingCount > 0) и не закончен
+                if playersRepairing > 0 and repairProgress < 100 then
                     -- Применяем бафф
                     local boostPercent = GeneratorBoostConfig.BoostPercent / 100
                     local boostMultiplier = 1 + boostPercent
@@ -201,7 +207,7 @@ local function monitorGeneratorsLoop()
                         applyGeneratorBoost(generator)
                     end
                 elseif activeGeneratorBoosts[generator] then
-                    -- Если генератор не чинится - снимаем бафф
+                    -- Если никто не чинит - снимаем бафф
                     removeGeneratorBoost(generator)
                 end
             end
@@ -210,22 +216,23 @@ local function monitorGeneratorsLoop()
         -- Проверяем, не закончился ли ремонт у генераторов с баффом
         for gen, _ in pairs(activeGeneratorBoosts) do
             if gen and gen.Parent then
-                local isBeingRepaired = false
-                local repairProgress = 0
-                
+                local playersRepairing = 0
                 pcall(function()
-                    local attr = gen:GetAttribute("IsBeingRepaired")
-                    if attr ~= nil then
-                        isBeingRepaired = attr == true
+                    local count = gen:GetAttribute("PlayersRepairingCount")
+                    if count ~= nil and type(count) == "number" then
+                        playersRepairing = count
                     end
-                    
+                end)
+                
+                local repairProgress = 0
+                pcall(function()
                     local progress = gen:GetAttribute("RepairProgress")
                     if progress ~= nil and type(progress) == "number" then
                         repairProgress = progress
                     end
                 end)
                 
-                if not isBeingRepaired or repairProgress >= 100 then
+                if playersRepairing <= 0 or repairProgress >= 100 then
                     removeGeneratorBoost(gen)
                 end
             else
@@ -233,99 +240,27 @@ local function monitorGeneratorsLoop()
             end
         end
         
-        task.wait(0.5)
+        task.wait(0.3) -- Быстрая проверка
     end
 end
 
 -- Запускаем мониторинг
 task.spawn(monitorGeneratorsLoop)
 
--- Функция для поиска генератора по точке ремонта (БЕЗ ОШИБОК)
-local function findGeneratorFromRepairPoint(repairPoint)
-    if not repairPoint then return nil end
-    if type(repairPoint) ~= "table" then return nil end
-    if not repairPoint.Parent then return nil end
-    
-    local parent = repairPoint.Parent
-    
-    -- Проверяем сам родитель
-    if CollectionService:HasTag(parent, "Generator") then
-        return parent
-    end
-    
-    -- Проверяем имя
-    if parent.Name == "Generator" then
-        return parent
-    end
-    
-    -- Проверяем дочерние элементы
-    for _, child in ipairs(parent:GetDescendants()) do
-        if CollectionService:HasTag(child, "Generator") then
-            return child
-        end
-    end
-    
-    return nil
-end
-
--- БЕЗОПАСНАЯ функция обработки ремонта
-local function handleRepairAnim(...)
-    local args = {...}
-    
-    if #args == 0 then return end
-    
-    local repairPoint = nil
-    local isRepairing = false
-    
-    for i, arg in ipairs(args) do
-        if type(arg) == "table" and arg.Parent and type(arg.Parent) == "table" then
-            repairPoint = arg
-        end
-        if type(arg) == "boolean" then
-            isRepairing = arg
-        end
-    end
-    
-    if repairPoint then
-        local generator = findGeneratorFromRepairPoint(repairPoint)
-        if generator then
-            if isRepairing and GeneratorBoostConfig.Enabled then
-                applyGeneratorBoost(generator)
-            elseif not isRepairing then
-                removeGeneratorBoost(generator)
-            end
-        end
-    end
-end
-
--- Подключаемся к событиям ремонта
+-- Подключаемся к RepairAnim (только для отладки, без ошибок)
 local function setupRemoteListeners()
-    local success, Remotes = pcall(function() return ReplicatedStorage:FindFirstChild("Remotes") end)
-    if not success or not Remotes then 
-        print("[SOEKKI] Remotes не найдены")
-        return 
-    end
+    local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if not Remotes then return end
     
-    local success2, Generator = pcall(function() return Remotes:FindFirstChild("Generator") end)
-    if not success2 or not Generator then 
-        print("[SOEKKI] Generator ремоуты не найдены")
-        return 
-    end
+    local Generator = Remotes:FindFirstChild("Generator")
+    if not Generator then return end
     
     local RepairAnim = Generator:FindFirstChild("RepairAnim")
     if RepairAnim then
         RepairAnim.OnClientEvent:Connect(function(...)
-            pcall(handleRepairAnim, ...)
+            -- Игнорируем, так как там CFrame, а не объект
+            -- Просто для отладки
         end)
-        print("[SOEKKI] ✅ Подключен RepairAnim")
-    end
-    
-    local RepairEvent = Generator:FindFirstChild("RepairEvent")
-    if RepairEvent then
-        RepairEvent.OnClientEvent:Connect(function(...)
-            pcall(handleRepairAnim, ...)
-        end)
-        print("[SOEKKI] ✅ Подключен RepairEvent")
     end
 end
 
