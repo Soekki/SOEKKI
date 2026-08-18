@@ -1,4 +1,4 @@
--- main_ui.lua - ВСЕ ВКЛАДКИ + ВСЕ КНОПКИ ESP
+-- main_ui.lua - ВСЕ ВКЛАДКИ + ВСЕ КНОПКИ ESP + GENERATOR BOOST
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
@@ -16,6 +16,8 @@ local COLORS = {
 	ToggleOn = Color3.fromRGB(120, 80, 200),
 	TabActive = Color3.fromRGB(40, 40, 50),
 	TabInactive = Color3.fromRGB(25, 25, 32),
+	Success = Color3.fromRGB(0, 200, 100),
+	Danger = Color3.fromRGB(255, 70, 70),
 }
 
 -- ============================================
@@ -33,8 +35,8 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 --   ГЛАВНЫЙ ФРЕЙМ
 -- ============================================
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 600, 0, 450)
-mainFrame.Position = UDim2.new(0.5, -300, 0.5, -225)
+mainFrame.Size = UDim2.new(0, 650, 0, 480)
+mainFrame.Position = UDim2.new(0.5, -325, 0.5, -240)
 mainFrame.BackgroundColor3 = COLORS.Background
 mainFrame.BackgroundTransparency = 0.05
 mainFrame.BorderSizePixel = 0
@@ -189,8 +191,8 @@ contentPadding.Parent = contentArea
 --   БОКОВАЯ ПАНЕЛЬ
 -- ============================================
 local sidebar = Instance.new("Frame")
-sidebar.Size = UDim2.new(0, 140, 0, 280)
-sidebar.Position = UDim2.new(1, -150, 0.5, -140)
+sidebar.Size = UDim2.new(0, 140, 0, 310)
+sidebar.Position = UDim2.new(1, -150, 0.5, -155)
 sidebar.BackgroundColor3 = COLORS.Darker
 sidebar.BackgroundTransparency = 0.2
 sidebar.BorderSizePixel = 0
@@ -288,9 +290,9 @@ local function createTab(name, icon)
 end
 
 -- ============================================
---   СОЗДАНИЕ TOGGLE
+--   СОЗДАНИЕ TOGGLE (ОБНОВЛЕННЫЙ)
 -- ============================================
-local function createToggle(parent, labelText, optionName)
+local function createToggle(parent, labelText, optionName, customCallback)
 	local container = Instance.new("Frame")
 	container.Size = UDim2.new(1, 0, 0, 30)
 	container.BackgroundTransparency = 1
@@ -348,21 +350,23 @@ local function createToggle(parent, labelText, optionName)
 		local newState = not isOn
 		updateToggle(newState)
 		
-		if _G.ToggleESP then
+		if customCallback then
+			customCallback(newState)
+		elseif _G.ToggleESP then
 			_G.ToggleESP(optionName)
 		end
 	end)
 	
 	-- Загружаем состояние
 	task.wait(0.1)
-	if _G.GetESPState then
+	if not customCallback and _G.GetESPState then
 		local state = _G.GetESPState(optionName)
 		if state ~= nil then
 			updateToggle(state)
 		end
 	end
 	
-	return updateToggle
+	return updateToggle, toggleBtn
 end
 
 -- ============================================
@@ -377,7 +381,7 @@ createTab("Misc", "⚙")
 createTab("Settings", "🔧")
 
 -- ============================================
---   НАПОЛНЕНИЕ ВКЛАДКИ VISUAL (ВСЕ КНОПКИ ESP)
+--   ВКЛАДКА VISUAL (ESP)
 -- ============================================
 local visualTab = tabs["Visual"]
 visualTab.Visible = true
@@ -453,21 +457,44 @@ miscSpacing2.Parent = visualTab
 createToggle(visualTab, "Full Bright", "FullBright")
 
 -- ============================================
---   ДРУГИЕ ВКЛАДКИ (ПУСТЫЕ, ДЛЯ БУДУЩИХ ФУНКЦИЙ)
+--   ВКЛАДКА MOVEMENT
 -- ============================================
--- Movement
 local movementTab = tabs["Movement"]
-local movLabel = Instance.new("TextLabel")
-movLabel.Size = UDim2.new(1, 0, 0, 30)
-movLabel.BackgroundTransparency = 1
-movLabel.Text = "🚀 Movement options coming soon..."
-movLabel.TextColor3 = COLORS.TextDim
-movLabel.TextSize = 14
-movLabel.Font = Enum.Font.Gotham
-movLabel.TextXAlignment = Enum.TextXAlignment.Center
-movLabel.Parent = movementTab
 
--- Modification
+local movLayout = Instance.new("UIListLayout")
+movLayout.Padding = UDim.new(0, 4)
+movLayout.SortOrder = Enum.SortOrder.LayoutOrder
+movLayout.Parent = movementTab
+
+local movPadding = Instance.new("UIPadding")
+movPadding.PaddingTop = UDim.new(0, 5)
+movPadding.PaddingLeft = UDim.new(0, 5)
+movPadding.PaddingRight = UDim.new(0, 5)
+movPadding.PaddingBottom = UDim.new(0, 10)
+movPadding.Parent = movementTab
+
+movementTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
+movementTab.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local movTitle = Instance.new("TextLabel")
+movTitle.Size = UDim2.new(1, 0, 0, 25)
+movTitle.BackgroundTransparency = 1
+movTitle.Text = "▶ Movement Settings"
+movTitle.TextColor3 = COLORS.Accent
+movTitle.TextSize = 14
+movTitle.Font = Enum.Font.GothamBold
+movTitle.TextXAlignment = Enum.TextXAlignment.Left
+movTitle.Parent = movementTab
+
+createToggle(movementTab, "Speed Boost", "SpeedBoost")
+createToggle(movementTab, "Infinite Lunge", "InfiniteLunge")
+createToggle(movementTab, "Noclip (Vaults/Pallets)", "NoclipVaultsPallets")
+createToggle(movementTab, "No Stun", "NoStun")
+createToggle(movementTab, "Auto Moonwalk", "AutoMoonwalk")
+
+-- ============================================
+--   ВКЛАДКА MODIFICATION (С GENERATOR BOOST)
+-- ============================================
 local modTab = tabs["Modification"]
 
 local modLayout = Instance.new("UIListLayout")
@@ -485,6 +512,9 @@ modPadding.Parent = modTab
 modTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
 modTab.CanvasSize = UDim2.new(0, 0, 0, 0)
 
+-- ============================================
+--   ANIMATIONS (уже было)
+-- ============================================
 local animTitle = Instance.new("TextLabel")
 animTitle.Size = UDim2.new(1, 0, 0, 25)
 animTitle.BackgroundTransparency = 1
@@ -632,53 +662,389 @@ player.CharacterAdded:Connect(function()
     stopMenuAnimation()
 end)
 
--- Combat
+-- ============================================
+--   GENERATOR BOOST (НОВЫЙ БЛОК)
+-- ============================================
+
+-- Разделитель
+local genDivider = Instance.new("Frame")
+genDivider.Size = UDim2.new(1, 0, 0, 1)
+genDivider.BackgroundColor3 = COLORS.Darker
+genDivider.BackgroundTransparency = 0.5
+genDivider.Parent = modTab
+
+local genSpacing = Instance.new("Frame")
+genSpacing.Size = UDim2.new(1, 0, 0, 10)
+genSpacing.BackgroundTransparency = 1
+genSpacing.Parent = modTab
+
+-- Заголовок Generator Boost
+local genBoostTitle = Instance.new("TextLabel")
+genBoostTitle.Size = UDim2.new(1, 0, 0, 25)
+genBoostTitle.BackgroundTransparency = 1
+genBoostTitle.Text = "▶ Generator Boost"
+genBoostTitle.TextColor3 = COLORS.Accent
+genBoostTitle.TextSize = 14
+genBoostTitle.Font = Enum.Font.GothamBold
+genBoostTitle.TextXAlignment = Enum.TextXAlignment.Left
+genBoostTitle.Parent = modTab
+
+local genBoostDesc = Instance.new("TextLabel")
+genBoostDesc.Size = UDim2.new(1, 0, 0, 20)
+genBoostDesc.BackgroundTransparency = 1
+genBoostDesc.Text = "Ускоряет ремонт генераторов через RepairEvent"
+genBoostDesc.TextColor3 = COLORS.TextDim
+genBoostDesc.TextSize = 11
+genBoostDesc.Font = Enum.Font.Gotham
+genBoostDesc.TextXAlignment = Enum.TextXAlignment.Left
+genBoostDesc.Parent = modTab
+
+local genBoostSpacing = Instance.new("Frame")
+genBoostSpacing.Size = UDim2.new(1, 0, 0, 5)
+genBoostSpacing.BackgroundTransparency = 1
+genBoostSpacing.Parent = modTab
+
+-- Toggle для Generator Boost
+local genToggleContainer = Instance.new("Frame")
+genToggleContainer.Size = UDim2.new(1, 0, 0, 30)
+genToggleContainer.BackgroundTransparency = 1
+genToggleContainer.Parent = modTab
+
+local genToggleLabel = Instance.new("TextLabel")
+genToggleLabel.Size = UDim2.new(1, -50, 1, 0)
+genToggleLabel.BackgroundTransparency = 1
+genToggleLabel.Text = "Enable Repair Boost"
+genToggleLabel.TextColor3 = COLORS.Text
+genToggleLabel.TextSize = 13
+genToggleLabel.Font = Enum.Font.Gotham
+genToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+genToggleLabel.Parent = genToggleContainer
+
+local genToggleBtn = Instance.new("TextButton")
+genToggleBtn.Size = UDim2.new(0, 40, 0, 22)
+genToggleBtn.Position = UDim2.new(1, -45, 0.5, -11)
+genToggleBtn.BackgroundColor3 = COLORS.ToggleOff
+genToggleBtn.Text = ""
+genToggleBtn.BorderSizePixel = 0
+genToggleBtn.Parent = genToggleContainer
+
+local genToggleCorner = Instance.new("UICorner")
+genToggleCorner.CornerRadius = UDim.new(0, 11)
+genToggleCorner.Parent = genToggleBtn
+
+local genToggleDot = Instance.new("Frame")
+genToggleDot.Size = UDim2.new(0, 16, 0, 16)
+genToggleDot.Position = UDim2.new(0, 3, 0.5, -8)
+genToggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+genToggleDot.BorderSizePixel = 0
+genToggleDot.Parent = genToggleBtn
+
+local genDotCorner = Instance.new("UICorner")
+genDotCorner.CornerRadius = UDim.new(0, 8)
+genDotCorner.Parent = genToggleDot
+
+local genBoostEnabled = false
+
+local function updateGenToggle(state)
+    genBoostEnabled = state
+    if state then
+        genToggleBtn.BackgroundColor3 = COLORS.ToggleOn
+        genToggleDot.Position = UDim2.new(0, 21, 0.5, -8)
+        genToggleDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        genToggleLabel.Text = "Enable Repair Boost ✅"
+        genToggleLabel.TextColor3 = COLORS.Success
+    else
+        genToggleBtn.BackgroundColor3 = COLORS.ToggleOff
+        genToggleDot.Position = UDim2.new(0, 3, 0.5, -8)
+        genToggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+        genToggleLabel.Text = "Enable Repair Boost"
+        genToggleLabel.TextColor3 = COLORS.Text
+    end
+end
+
+genToggleBtn.MouseButton1Click:Connect(function()
+    local newState = not genBoostEnabled
+    updateGenToggle(newState)
+    
+    if _G.GeneratorBoost then
+        _G.GeneratorBoost.Enabled = newState
+        if newState then
+            _G.GeneratorBoost:Toggle()
+            print("[UI] 🟢 Generator Boost ENABLED!")
+        else
+            _G.GeneratorBoost:Toggle()
+            print("[UI] 🔴 Generator Boost DISABLED!")
+        end
+    else
+        warn("[UI] ❌ GeneratorBoost not loaded!")
+    end
+end)
+
+-- Кнопка "Repair Nearest Generator"
+local repairNearestBtn = Instance.new("TextButton")
+repairNearestBtn.Size = UDim2.new(1, 0, 0, 30)
+repairNearestBtn.BackgroundColor3 = COLORS.Darker
+repairNearestBtn.BackgroundTransparency = 0.15
+repairNearestBtn.BorderSizePixel = 0
+repairNearestBtn.Text = "⚡ Repair Nearest Generator"
+repairNearestBtn.TextColor3 = COLORS.Text
+repairNearestBtn.TextSize = 13
+repairNearestBtn.Font = Enum.Font.GothamBold
+repairNearestBtn.TextXAlignment = Enum.TextXAlignment.Center
+repairNearestBtn.Parent = modTab
+
+local repairNearestCorner = Instance.new("UICorner")
+repairNearestCorner.CornerRadius = UDim.new(0, 6)
+repairNearestCorner.Parent = repairNearestBtn
+
+repairNearestBtn.MouseButton1Click:Connect(function()
+    if _G.GeneratorBoost then
+        local nearest, dist = _G.GeneratorBoost:GetNearestGenerator()
+        if nearest then
+            print("[UI] 🔧 Starting repair on nearest generator (distance: " .. dist .. ")")
+            _G.GeneratorBoost:StartRepairOnTarget(nearest)
+        else
+            print("[UI] ⚠️ No generators found nearby!")
+        end
+    else
+        print("[UI] ❌ GeneratorBoost not loaded!")
+    end
+end)
+
+-- Кнопка "Stop Repair"
+local stopRepairBtn = Instance.new("TextButton")
+stopRepairBtn.Size = UDim2.new(1, 0, 0, 30)
+stopRepairBtn.BackgroundColor3 = COLORS.ToggleOff
+stopRepairBtn.BackgroundTransparency = 0.2
+stopRepairBtn.BorderSizePixel = 0
+stopRepairBtn.Text = "⏹ Stop Repair"
+stopRepairBtn.TextColor3 = COLORS.Text
+stopRepairBtn.TextSize = 13
+stopRepairBtn.Font = Enum.Font.GothamBold
+stopRepairBtn.TextXAlignment = Enum.TextXAlignment.Center
+stopRepairBtn.Parent = modTab
+
+local stopRepairCorner = Instance.new("UICorner")
+stopRepairCorner.CornerRadius = UDim.new(0, 6)
+stopRepairCorner.Parent = stopRepairBtn
+
+stopRepairBtn.MouseButton1Click:Connect(function()
+    if _G.GeneratorBoost then
+        _G.GeneratorBoost.StopRepair()
+        print("[UI] ⏹ Repair stopped!")
+    end
+end)
+
+-- Индикатор статуса
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, 0, 0, 20)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Status: Idle"
+statusLabel.TextColor3 = COLORS.TextDim
+statusLabel.TextSize = 11
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = modTab
+
+-- Обновление статуса
+local function updateStatus()
+    if _G.GeneratorBoost and _G.GeneratorBoost.IsRepairing then
+        statusLabel.Text = "Status: ⚡ Repairing..."
+        statusLabel.TextColor3 = COLORS.Success
+    else
+        statusLabel.Text = "Status: Idle"
+        statusLabel.TextColor3 = COLORS.TextDim
+    end
+end
+
+-- Обновляем статус каждые 0.5 секунды
+game:GetService("RunService").Heartbeat:Connect(function()
+    if mainFrame.Visible then
+        updateStatus()
+    end
+end)
+
+-- ============================================
+--   ВКЛАДКА COMBAT
+-- ============================================
 local combatTab = tabs["Combat"]
-local combatLabel = Instance.new("TextLabel")
-combatLabel.Size = UDim2.new(1, 0, 0, 30)
-combatLabel.BackgroundTransparency = 1
-combatLabel.Text = "🔪 Combat options coming soon..."
-combatLabel.TextColor3 = COLORS.TextDim
-combatLabel.TextSize = 14
-combatLabel.Font = Enum.Font.Gotham
-combatLabel.TextXAlignment = Enum.TextXAlignment.Center
-combatLabel.Parent = combatTab
 
--- Player
+local combatLayout = Instance.new("UIListLayout")
+combatLayout.Padding = UDim.new(0, 4)
+combatLayout.SortOrder = Enum.SortOrder.LayoutOrder
+combatLayout.Parent = combatTab
+
+local combatPadding = Instance.new("UIPadding")
+combatPadding.PaddingTop = UDim.new(0, 5)
+combatPadding.PaddingLeft = UDim.new(0, 5)
+combatPadding.PaddingRight = UDim.new(0, 5)
+combatPadding.PaddingBottom = UDim.new(0, 10)
+combatPadding.Parent = combatTab
+
+combatTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
+combatTab.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local combatTitle = Instance.new("TextLabel")
+combatTitle.Size = UDim2.new(1, 0, 0, 25)
+combatTitle.BackgroundTransparency = 1
+combatTitle.Text = "▶ Combat Settings"
+combatTitle.TextColor3 = COLORS.Accent
+combatTitle.TextSize = 14
+combatTitle.Font = Enum.Font.GothamBold
+combatTitle.TextXAlignment = Enum.TextXAlignment.Left
+combatTitle.Parent = combatTab
+
+createToggle(combatTab, "Auto Parry", "AutoParry")
+createToggle(combatTab, "Auto Skill Check", "AutoSkillCheck")
+createToggle(combatTab, "Instant Skill Check", "InstantSkillCheck")
+createToggle(combatTab, "No Skill Checks", "NoSkillChecks")
+createToggle(combatTab, "Anti Wiggle", "AntiWiggle")
+createToggle(combatTab, "Auto Self Unhook", "AutoSelfUnhook")
+
+-- ============================================
+--   ВКЛАДКА PLAYER
+-- ============================================
 local playerTab = tabs["Player"]
-local playerLabel = Instance.new("TextLabel")
-playerLabel.Size = UDim2.new(1, 0, 0, 30)
-playerLabel.BackgroundTransparency = 1
-playerLabel.Text = "👤 Player options coming soon..."
-playerLabel.TextColor3 = COLORS.TextDim
-playerLabel.TextSize = 14
-playerLabel.Font = Enum.Font.Gotham
-playerLabel.TextXAlignment = Enum.TextXAlignment.Center
-playerLabel.Parent = playerTab
 
--- Misc
+local playerLayout = Instance.new("UIListLayout")
+playerLayout.Padding = UDim.new(0, 4)
+playerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+playerLayout.Parent = playerTab
+
+local playerPadding = Instance.new("UIPadding")
+playerPadding.PaddingTop = UDim.new(0, 5)
+playerPadding.PaddingLeft = UDim.new(0, 5)
+playerPadding.PaddingRight = UDim.new(0, 5)
+playerPadding.PaddingBottom = UDim.new(0, 10)
+playerPadding.Parent = playerTab
+
+playerTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
+playerTab.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local playerTitle = Instance.new("TextLabel")
+playerTitle.Size = UDim2.new(1, 0, 0, 25)
+playerTitle.BackgroundTransparency = 1
+playerTitle.Text = "▶ Player Settings"
+playerTitle.TextColor3 = COLORS.Accent
+playerTitle.TextSize = 14
+playerTitle.Font = Enum.Font.GothamBold
+playerTitle.TextXAlignment = Enum.TextXAlignment.Left
+playerTitle.Parent = playerTab
+
+createToggle(playerTab, "Infinite Flashlight", "InfiniteFlashlight")
+createToggle(playerTab, "Rainbow Character", "RainbowCharacter")
+createToggle(playerTab, "Walk While Emoting", "WalkWhileEmoting")
+
+-- ============================================
+--   ВКЛАДКА MISC
+-- ============================================
 local miscTab = tabs["Misc"]
-local miscLabel = Instance.new("TextLabel")
-miscLabel.Size = UDim2.new(1, 0, 0, 30)
-miscLabel.BackgroundTransparency = 1
-miscLabel.Text = "⚙ Misc options coming soon..."
-miscLabel.TextColor3 = COLORS.TextDim
-miscLabel.TextSize = 14
-miscLabel.Font = Enum.Font.Gotham
-miscLabel.TextXAlignment = Enum.TextXAlignment.Center
-miscLabel.Parent = miscTab
 
--- Settings
+local miscLayout = Instance.new("UIListLayout")
+miscLayout.Padding = UDim.new(0, 4)
+miscLayout.SortOrder = Enum.SortOrder.LayoutOrder
+miscLayout.Parent = miscTab
+
+local miscPadding = Instance.new("UIPadding")
+miscPadding.PaddingTop = UDim.new(0, 5)
+miscPadding.PaddingLeft = UDim.new(0, 5)
+miscPadding.PaddingRight = UDim.new(0, 5)
+miscPadding.PaddingBottom = UDim.new(0, 10)
+miscPadding.Parent = miscTab
+
+miscTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
+miscTab.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local miscTitle = Instance.new("TextLabel")
+miscTitle.Size = UDim2.new(1, 0, 0, 25)
+miscTitle.BackgroundTransparency = 1
+miscTitle.Text = "▶ Misc Settings"
+miscTitle.TextColor3 = COLORS.Accent
+miscTitle.TextSize = 14
+miscTitle.Font = Enum.Font.GothamBold
+miscTitle.TextXAlignment = Enum.TextXAlignment.Left
+miscTitle.Parent = miscTab
+
+createToggle(miscTab, "Show Info Banner", "ShowInfoBanner")
+createToggle(miscTab, "Show Spectator List", "ShowSpectatorList")
+createToggle(miscTab, "Show Hotkey Overlay", "ShowHotkeyOverlay")
+createToggle(miscTab, "Hide Flowstate UI", "HideFlowstateUI")
+createToggle(miscTab, "Hide Parry UI", "HideParryUI")
+
+-- ============================================
+--   ВКЛАДКА SETTINGS
+-- ============================================
 local settingsTab = tabs["Settings"]
-local settingsLabel = Instance.new("TextLabel")
-settingsLabel.Size = UDim2.new(1, 0, 0, 30)
-settingsLabel.BackgroundTransparency = 1
-settingsLabel.Text = "🔧 Settings options coming soon..."
-settingsLabel.TextColor3 = COLORS.TextDim
-settingsLabel.TextSize = 14
-settingsLabel.Font = Enum.Font.Gotham
-settingsLabel.TextXAlignment = Enum.TextXAlignment.Center
-settingsLabel.Parent = settingsTab
+
+local settingsLayout = Instance.new("UIListLayout")
+settingsLayout.Padding = UDim.new(0, 4)
+settingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+settingsLayout.Parent = settingsTab
+
+local settingsPadding = Instance.new("UIPadding")
+settingsPadding.PaddingTop = UDim.new(0, 5)
+settingsPadding.PaddingLeft = UDim.new(0, 5)
+settingsPadding.PaddingRight = UDim.new(0, 5)
+settingsPadding.PaddingBottom = UDim.new(0, 10)
+settingsPadding.Parent = settingsTab
+
+settingsTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
+settingsTab.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local settingsTitle = Instance.new("TextLabel")
+settingsTitle.Size = UDim2.new(1, 0, 0, 25)
+settingsTitle.BackgroundTransparency = 1
+settingsTitle.Text = "▶ Settings"
+settingsTitle.TextColor3 = COLORS.Accent
+settingsTitle.TextSize = 14
+settingsTitle.Font = Enum.Font.GothamBold
+settingsTitle.TextXAlignment = Enum.TextXAlignment.Left
+settingsTitle.Parent = settingsTab
+
+-- Кнопка Unload
+local unloadBtn = Instance.new("TextButton")
+unloadBtn.Size = UDim2.new(1, 0, 0, 35)
+unloadBtn.BackgroundColor3 = COLORS.Danger
+unloadBtn.BackgroundTransparency = 0.2
+unloadBtn.BorderSizePixel = 0
+unloadBtn.Text = "⚠ UNLOAD SCRIPT"
+unloadBtn.TextColor3 = COLORS.Danger
+unloadBtn.TextSize = 14
+unloadBtn.Font = Enum.Font.GothamBold
+unloadBtn.Parent = settingsTab
+
+local unloadCorner = Instance.new("UICorner")
+unloadCorner.CornerRadius = UDim.new(0, 6)
+unloadCorner.Parent = unloadBtn
+
+unloadBtn.MouseButton1Click:Connect(function()
+    print("[UI] ⚠ Unloading...")
+    screenGui:Destroy()
+    if _G.GeneratorBoost then
+        _G.GeneratorBoost.StopRepair()
+    end
+    print("[UI] ✅ Unloaded!")
+end)
+
+unloadBtn.MouseEnter:Connect(function()
+    unloadBtn.BackgroundTransparency = 0.1
+end)
+
+unloadBtn.MouseLeave:Connect(function()
+    unloadBtn.BackgroundTransparency = 0.2
+end)
+
+-- Информация
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Size = UDim2.new(1, 0, 0, 40)
+infoLabel.BackgroundTransparency = 1
+infoLabel.Text = "SOEKKI v1.0.0\nPress RightShift to toggle menu"
+infoLabel.TextColor3 = COLORS.TextDim
+infoLabel.TextSize = 11
+infoLabel.Font = Enum.Font.Gotham
+infoLabel.TextXAlignment = Enum.TextXAlignment.Center
+infoLabel.TextYAlignment = Enum.TextYAlignment.Center
+infoLabel.Parent = settingsTab
 
 -- ============================================
 --   АКТИВАЦИЯ ПЕРВОЙ ВКЛАДКИ

@@ -15,7 +15,25 @@ end
 -- ТВОЯ ССЫЛКА (репозиторий должен быть ПУБЛИЧНЫМ!)
 local BASE_URL = "https://raw.githubusercontent.com/Soekki/SOEKKI/refs/heads/main/"
 
--- Загружаем функции
+-- 1. Загружаем конфиг
+local configCode = loadModule(BASE_URL .. "config.lua")
+local config, configErr = loadstring(configCode)
+if not config then
+    error("Compile error in config: " .. tostring(configErr))
+end
+config()
+print("[SOEKKI] ✅ config loaded!")
+
+-- 2. Загружаем Generator Boost
+local boostCode = loadModule(BASE_URL .. "generator_boost.lua")
+local boost, boostErr = loadstring(boostCode)
+if not boost then
+    error("Compile error in generator_boost: " .. tostring(boostErr))
+end
+boost()
+print("[SOEKKI] ✅ generator_boost loaded!")
+
+-- 3. Загружаем функции
 local functionsCode = loadModule(BASE_URL .. "main_functions.lua")
 local func, funcErr = loadstring(functionsCode)
 if not func then
@@ -24,7 +42,7 @@ end
 func()
 print("[SOEKKI] ✅ main_functions loaded!")
 
--- Загружаем UI
+-- 4. Загружаем UI
 local uiCode = loadModule(BASE_URL .. "main_ui.lua")
 local ui, uiErr = loadstring(uiCode)
 if not ui then
@@ -33,4 +51,6 @@ end
 ui()
 print("[SOEKKI] ✅ main_ui loaded!")
 
-print("[SOEKKI] 🚀 ALL LOADED! Press RightShift to toggle menu.")
+print("[SOEKKI] 🚀 ALL LOADED!")
+print("[SOEKKI] 💡 Press RightShift to toggle menu.")
+print("[SOEKKI] 💡 Use _G.GeneratorBoost:Toggle() to enable/disable repair boost")

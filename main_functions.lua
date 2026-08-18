@@ -589,4 +589,40 @@ _G.GetESPState = module.GetESPState
 
 print("[SOEKKI] Functions loaded!")
 
+
+-- ============================================
+--   ЗАГРУЗКА GENERATOR BOOST
+-- ============================================
+local function LoadGeneratorBoost()
+    print("[SOEKKI] Loading GeneratorBoost...")
+    
+    -- Проверяем наличие модуля
+    local boostModule = script.Parent:FindFirstChild("generator_boost")
+    if not boostModule then
+        warn("[SOEKKI] ❌ generator_boost.lua not found!")
+        return
+    end
+    
+    local boostFunc, err = loadstring(boostModule:GetFullName())
+    if not boostFunc then
+        warn("[SOEKKI] ❌ Failed to load generator_boost:", err)
+        return
+    end
+    
+    pcall(boostFunc)
+    print("[SOEKKI] ✅ GeneratorBoost loaded!")
+    
+    -- Добавляем функцию в глобальный доступ
+    _G.ToggleGeneratorBoost = function()
+        if _G.GeneratorBoost then
+            return _G.GeneratorBoost:Toggle()
+        end
+        warn("[SOEKKI] ❌ GeneratorBoost not available!")
+        return false
+    end
+end
+
+-- Загружаем
+LoadGeneratorBoost()
+
 return module
