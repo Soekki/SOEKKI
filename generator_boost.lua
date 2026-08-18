@@ -1,4 +1,18 @@
--- generator_boost.lua - БАФФ СКОРОСТИ ПОЧИНКИ ГЕНЕРАТОРОВ
+-- generator_boost.lua
+-- SOEKKI - Generator Repair Boost
+--
+-- Important:
+-- This module uses the game's existing Generator.RepairEvent.
+-- The server remains authoritative; this script cannot force a repair
+-- value that the server rejects.
+--
+-- UI compatibility:
+-- main_ui.lua currently does:
+--     GeneratorBoost.Enabled = true
+--     GeneratorBoost:Toggle()
+-- so Toggle() below intentionally SYNCHRONIZES to Enabled instead of
+-- blindly inverting it.
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,336 +20,490 @@ local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 
--- ============================================
---   ПОИСК REMOTE EVENTS (ВСЕ ВОЗМОЖНЫЕ ВАРИАНТЫ)
--- ============================================
+-- ============================================================
+-- CONFIG
+-- ============================================================
+
+local DEFAULT_MULTIPLIER = 5
+local MIN_MULTIPLIER = 1
+local MAX_MULTIPLIER = 20
+
+-- Base interval between repair requests.
+-- The actual server-side repair amount/rate is determined by the game.
+local BASE_INTERVAL = 0.10
+
+-- ============================================================
+-- REMOTES
+-- ============================================================
+
 local function FindRemote(path)
-    local parts = {}
-    for part in string.gmatch(path, "[^.]+") do
-        table.insert(parts, part)
-    end
-    
     local current = ReplicatedStorage
-    for _, part in ipairs(parts) do
-        if not current then return nil end
+
+    for part in string.gmatch(path, "[^.]+") do
+        if not current then
+            return nil
+        end
+
         current = current:FindFirstChild(part)
     end
+
     return current
 end
 
--- Ищем RepairEvent во всех возможных местах
-local RepairEvent = FindRemote("Remotes.Generator.RepairEvent")
+local RepairEvent =
+    FindRemote("Remotes.Generator.RepairEvent")
     or FindRemote("Remotes.RepairEvent")
     or FindRemote("RepairEvent")
     or ReplicatedStorage:FindFirstChild("RepairEvent", true)
 
-local RepairAnim = FindRemote("Remotes.Generator.RepairAnim")
+local RepairAnim =
+    FindRemote("Remotes.Generator.RepairAnim")
     or FindRemote("Remotes.RepairAnim")
     or FindRemote("RepairAnim")
     or ReplicatedStorage:FindFirstChild("RepairAnim", true)
 
-local RepairCommit = FindRemote("Remotes.Generator.RepairCommit")
-    or FindRemote("Remotes.RepairCommit")
-    or FindRemote("RepairCommit")
-    or ReplicatedStorage:FindFirstChild("RepairCommit", true)
+local RepairVFX =
+    FindRemote("Remotes.Generator.RepairVFX")
+    or FindRemote("Remotes.RepairVFX")
+    or FindRemote("RepairVFX")
+    or ReplicatedStorage:FindFirstChild("RepairVFX", true)
 
 print("[GeneratorBoost] 🔧 Found RepairEvent:", RepairEvent and "✅" or "❌")
 print("[GeneratorBoost] 🔧 Found RepairAnim:", RepairAnim and "✅" or "❌")
-print("[GeneratorBoost] 🔧 Found RepairCommit:", RepairCommit and "✅" or "❌")
+print("[GeneratorBoost] 🔧 Found RepairVFX:", RepairVFX and "✅" or "❌")
 
--- ============================================
---   ОСНОВНАЯ ЛОГИКА
--- ============================================
+-- RepairCommit is intentionally not used: it is not present in the
+-- supplied Generator remote list.
+local RepairCommit = nil
+
+-- ============================================================
+-- STATE
+-- ============================================================
 
 local GeneratorBoost = {
     Enabled = false,
     IsRepairing = false,
     CurrentTarget = nil,
-    Connections = {},
+
+    Multiplier = DEFAULT_MULTIPLIER,
+
     RepairLoopConnection = nil,
     ScanConnection = nil,
+
+    LastRepairSend = 0,
+    RepairRequests = 0,
+    SuccessfulCalls = 0,
+
+    Connections = {},
 }
 
--- ============================================
---   ОТПРАВКА REPAIR EVENT
--- ============================================
-local function SendRepairEvent(generator, character)
-    if not RepairEvent then 
-        warn("[GeneratorBoost] ❌ RepairEvent not found!")
-        return false 
+-- ============================================================
+-- HELPERS
+-- ============================================================
+
+local function getCharacter()
+    return LocalPlayer.Character
+end
+
+local function getRootPart()
+    local character = getCharacter()
+
+    return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+local function getProgress(generator)
+    if not generator then
+        return 0
     end
-    if not generator or not generator.Parent then return false end
-    
-    -- Пробуем разные форматы данных
-    local dataFormats = {
-        {generator = generator, character = character},
-        {Generator = generator, Character = character},
-        {gen = generator, char = character},
-        {generator},
-        {generator, character},
-    }
-    
-    for _, data in ipairs(dataFormats) do
-        local success, err = pcall(function()
-            RepairEvent:FireServer(unpack(data))
-        end)
-        if success then 
-            return true 
-        end
+
+    local value =
+        generator:GetAttribute("RepairProgress")
+        or generator:GetAttribute("Progress")
+
+    if typeof(value) == "number" then
+        return value
     end
-    
-    -- Если ничего не сработало, пробуем просто FireServer без параметров
-    local success, err = pcall(function()
-        RepairEvent:FireServer()
-    end)
-    
-    if not success then
-        warn("[GeneratorBoost] ❌ Failed to send RepairEvent:", err)
+
+    return 0
+end
+
+local function getInterval()
+    local multiplier = tonumber(GeneratorBoost.Multiplier) or DEFAULT_MULTIPLIER
+
+    multiplier = math.clamp(
+        multiplier,
+        MIN_MULTIPLIER,
+        MAX_MULTIPLIER
+    )
+
+    -- Higher multiplier = more frequent repair requests.
+    return math.max(0.025, BASE_INTERVAL / multiplier)
+end
+
+-- ============================================================
+-- REPAIR REMOTE
+-- ============================================================
+
+local function SendRepairEvent(generator)
+    if not RepairEvent then
+        warn("[GeneratorBoost] ❌ RepairEvent not found")
         return false
     end
-    
-    return true
-end
 
--- ============================================
---   ОТПРАВКА REPAIR ANIM
--- ============================================
-local function SendRepairAnim(generator, character)
-    if not RepairAnim then return false end
-    
-    local dataFormats = {
-        {generator = generator, character = character},
-        {Generator = generator, Character = character},
-        {gen = generator, char = character},
-        {generator},
-        {generator, character},
-    }
-    
-    for _, data in ipairs(dataFormats) do
-        local success, err = pcall(function()
-            RepairAnim:FireServer(unpack(data))
-        end)
-        if success then return true end
+    if not generator or not generator.Parent then
+        return false
     end
-    
-    return false
-end
 
--- ============================================
---   ОТПРАВКА REPAIR COMMIT
--- ============================================
-local function SendRepairCommit(generator, character)
-    if not RepairCommit then return false end
-    
-    local dataFormats = {
-        {generator = generator, character = character},
-        {Generator = generator, Character = character},
-        {gen = generator, char = character},
-        {generator},
-        {generator, character},
-    }
-    
-    for _, data in ipairs(dataFormats) do
-        local success, err = pcall(function()
-            RepairCommit:FireServer(unpack(data))
-        end)
-        if success then return true end
-    end
-    
-    return false
-end
+    local character = getCharacter()
 
--- ============================================
---   ЦИКЛ РЕМОНТА
--- ============================================
-local function StartRepairLoop(generator)
-    if not generator or not generator.Parent then 
-        print("[GeneratorBoost] ⚠️ Generator no longer exists!")
-        return 
+    if not character then
+        return false
     end
-    
-    if GeneratorBoost.IsRepairing and GeneratorBoost.CurrentTarget == generator then
-        return
-    end
-    
-    local character = LocalPlayer.Character
-    if not character then 
-        print("[GeneratorBoost] ⚠️ No character!")
-        return 
-    end
-    
-    -- Останавливаем предыдущий цикл
-    GeneratorBoost:StopRepair()
-    
-    GeneratorBoost.IsRepairing = true
-    GeneratorBoost.CurrentTarget = generator
-    
-    print("[GeneratorBoost] ⚡ Starting repair loop on generator:", generator.Name)
-    
-    local eventsPerCycle = 5
-    local lastSend = 0
-    local interval = 0.03
-    
-    -- Основной цикл
-    GeneratorBoost.RepairLoopConnection = RunService.Heartbeat:Connect(function()
-        if not GeneratorBoost.IsRepairing or not GeneratorBoost.Enabled then
-            GeneratorBoost:StopRepair()
-            return
-        end
-        
-        if not generator or not generator.Parent then
-            print("[GeneratorBoost] ⚠️ Generator destroyed!")
-            GeneratorBoost:StopRepair()
-            return
-        end
-        
-        -- Проверяем прогресс
-        local progress = generator:GetAttribute("RepairProgress") or generator:GetAttribute("Progress") or 0
-        if progress and progress >= 100 then
-            print("[GeneratorBoost] ✅ Generator completed!")
-            GeneratorBoost:StopRepair()
-            return
-        end
-        
-        -- Отправляем события с интервалом
-        local now = tick()
-        if now - lastSend >= interval then
-            lastSend = now
-            
-            for i = 1, eventsPerCycle do
-                SendRepairEvent(generator, character)
-                SendRepairAnim(generator, character)
-            end
-            
-            SendRepairCommit(generator, character)
-        end
+
+    GeneratorBoost.RepairRequests += 1
+
+    -- Do NOT fire several guessed argument formats.
+    -- The supplied remote dump confirms the RemoteEvent exists,
+    -- but not its exact server signature.
+    --
+    -- The first/most conservative form is the generator itself.
+    local ok, err = pcall(function()
+        RepairEvent:FireServer(generator)
     end)
+
+    if ok then
+        GeneratorBoost.SuccessfulCalls += 1
+        return true
+    end
+
+    warn("[GeneratorBoost] ❌ RepairEvent call failed:", err)
+
+    return false
 end
 
--- ============================================
---   ОСТАНОВКА РЕМОНТА
--- ============================================
+local function SendRepairAnim(generator)
+    if not RepairAnim then
+        return false
+    end
+
+    if not generator or not generator.Parent then
+        return false
+    end
+
+    local character = getCharacter()
+
+    if not character then
+        return false
+    end
+
+    local ok = pcall(function()
+        RepairAnim:FireServer(generator)
+    end)
+
+    return ok
+end
+
+-- ============================================================
+-- STATUS
+-- ============================================================
+
+function GeneratorBoost:GetStatus()
+    return {
+        Enabled = self.Enabled,
+        IsRepairing = self.IsRepairing,
+        CurrentTarget = self.CurrentTarget,
+        Multiplier = self.Multiplier,
+        RepairRequests = self.RepairRequests,
+        SuccessfulCalls = self.SuccessfulCalls,
+        Interval = getInterval(),
+    }
+end
+
+function GeneratorBoost:SetMultiplier(value)
+    value = tonumber(value)
+
+    if not value then
+        return self.Multiplier
+    end
+
+    self.Multiplier = math.clamp(
+        value,
+        MIN_MULTIPLIER,
+        MAX_MULTIPLIER
+    )
+
+    print(
+        "[GeneratorBoost] ⚙ Multiplier set to x"
+            .. tostring(self.Multiplier)
+    )
+
+    return self.Multiplier
+end
+
+function GeneratorBoost:GetMultiplier()
+    return self.Multiplier
+end
+
+-- ============================================================
+-- STOP
+-- ============================================================
+
 function GeneratorBoost:StopRepair()
-    if GeneratorBoost.IsRepairing then
+    if self.IsRepairing then
         print("[GeneratorBoost] ⏹ Stopping repair loop...")
     end
-    
-    GeneratorBoost.IsRepairing = false
-    GeneratorBoost.CurrentTarget = nil
-    
-    if GeneratorBoost.RepairLoopConnection then
-        GeneratorBoost.RepairLoopConnection:Disconnect()
-        GeneratorBoost.RepairLoopConnection = nil
+
+    self.IsRepairing = false
+    self.CurrentTarget = nil
+
+    if self.RepairLoopConnection then
+        self.RepairLoopConnection:Disconnect()
+        self.RepairLoopConnection = nil
     end
-    
-    if GeneratorBoost.ScanConnection then
-        GeneratorBoost.ScanConnection:Disconnect()
-        GeneratorBoost.ScanConnection = nil
-    end
+
+    self.LastRepairSend = 0
 end
 
--- ============================================
---   ВКЛЮЧЕНИЕ/ВЫКЛЮЧЕНИЕ БАФФА
--- ============================================
-function GeneratorBoost:Toggle()
-    self.Enabled = not self.Enabled
-    
-    if self.Enabled then
+-- ============================================================
+-- REPAIR LOOP
+-- ============================================================
+
+local function StartRepairLoop(generator)
+    if not generator or not generator.Parent then
+        warn("[GeneratorBoost] ⚠ Generator is invalid")
+        return
+    end
+
+    if not GeneratorBoost.Enabled then
+        warn("[GeneratorBoost] ⚠ Cannot start repair: boost is disabled")
+        return
+    end
+
+    local character = getCharacter()
+
+    if not character then
+        warn("[GeneratorBoost] ⚠ Character not found")
+        return
+    end
+
+    GeneratorBoost:StopRepair()
+
+    GeneratorBoost.IsRepairing = true
+    GeneratorBoost.CurrentTarget = generator
+    GeneratorBoost.LastRepairSend = 0
+
+    print(
+        "[GeneratorBoost] ⚡ Starting repair loop on generator:",
+        generator.Name,
+        "x" .. tostring(GeneratorBoost.Multiplier)
+    )
+
+    local elapsed = 0
+
+    GeneratorBoost.RepairLoopConnection =
+        RunService.Heartbeat:Connect(function(dt)
+            if not GeneratorBoost.Enabled then
+                GeneratorBoost:StopRepair()
+                return
+            end
+
+            if not GeneratorBoost.IsRepairing then
+                return
+            end
+
+            if not generator or not generator.Parent then
+                warn("[GeneratorBoost] ⚠ Generator disappeared")
+                GeneratorBoost:StopRepair()
+                return
+            end
+
+            local currentCharacter = getCharacter()
+
+            if not currentCharacter then
+                GeneratorBoost:StopRepair()
+                return
+            end
+
+            local progress = getProgress(generator)
+
+            if progress >= 100 then
+                print("[GeneratorBoost] ✅ Generator completed!")
+                GeneratorBoost:StopRepair()
+                return
+            end
+
+            elapsed += dt
+
+            local interval = getInterval()
+
+            if elapsed < interval then
+                return
+            end
+
+            elapsed = 0
+
+            -- One request per interval.
+            -- This avoids the old five-times-per-cycle remote spam.
+            SendRepairEvent(generator)
+
+            -- Animation is cosmetic and only sent when the remote exists.
+            SendRepairAnim(generator)
+        end)
+end
+
+-- ============================================================
+-- START REPAIR
+-- ============================================================
+
+function GeneratorBoost:StartRepairOnTarget(generator)
+    if not self.Enabled then
+        warn("[GeneratorBoost] ⚠ Boost is disabled. Enable it first.")
+        return false
+    end
+
+    if not generator or not generator.Parent then
+        warn("[GeneratorBoost] ⚠ Invalid generator")
+        return false
+    end
+
+    local progress = getProgress(generator)
+
+    if progress >= 100 then
+        print("[GeneratorBoost] ⚠ Generator is already completed")
+        return false
+    end
+
+    if self.IsRepairing and self.CurrentTarget == generator then
+        print("[GeneratorBoost] ℹ Already repairing this generator")
+        return true
+    end
+
+    StartRepairLoop(generator)
+
+    return self.IsRepairing
+end
+
+-- ============================================================
+-- ENABLE / DISABLE
+-- ============================================================
+
+function GeneratorBoost:SetEnabled(state)
+    state = state == true
+
+    if self.Enabled == state then
+        -- Keep the UI and module synchronized.
+        if not state then
+            self:StopRepair()
+        end
+
+        return self.Enabled
+    end
+
+    self.Enabled = state
+
+    if state then
         print("[GeneratorBoost] 🟢 Boost ENABLED!")
+
         local nearest = self:GetNearestGenerator()
+
         if nearest then
             self:StartRepairOnTarget(nearest)
         else
+            print("[GeneratorBoost] ⚠ No generator found; auto-scan enabled")
             self:StartAutoScan()
         end
     else
         print("[GeneratorBoost] 🔴 Boost DISABLED!")
         self:StopRepair()
+
+        if self.ScanConnection then
+            self.ScanConnection:Disconnect()
+            self.ScanConnection = nil
+        end
     end
-    
+
     return self.Enabled
 end
 
--- ============================================
---   АВТОМАТИЧЕСКОЕ СКАНИРОВАНИЕ
--- ============================================
+-- Compatibility with the current main_ui.lua.
+--
+-- Current UI first changes .Enabled and then calls :Toggle().
+-- Therefore this function synchronizes to .Enabled instead of
+-- inverting it a second time.
+function GeneratorBoost:Toggle()
+    local desiredState = self.Enabled == true
+
+    print(
+        "[GeneratorBoost] 🔄 Sync Toggle ->",
+        desiredState and "ON" or "OFF"
+    )
+
+    return self:SetEnabled(desiredState)
+end
+
+-- ============================================================
+-- AUTO SCAN
+-- ============================================================
+
 function GeneratorBoost:StartAutoScan()
     if self.ScanConnection then
         self.ScanConnection:Disconnect()
         self.ScanConnection = nil
     end
-    
-    if not self.Enabled then return end
-    
-    self.ScanConnection = RunService.Heartbeat:Connect(function()
-        if not self.Enabled then
-            self:StopRepair()
-            return
-        end
-        
-        if not self.IsRepairing then
-            local nearest = self:GetNearestGenerator()
-            if nearest then
-                self:StartRepairOnTarget(nearest)
+
+    if not self.Enabled then
+        return
+    end
+
+    self.ScanConnection =
+        RunService.Heartbeat:Connect(function()
+            if not self.Enabled then
+                if self.ScanConnection then
+                    self.ScanConnection:Disconnect()
+                    self.ScanConnection = nil
+                end
+
+                return
             end
-        end
-    end)
+
+            if not self.IsRepairing then
+                local nearest = self:GetNearestGenerator()
+
+                if nearest then
+                    self:StartRepairOnTarget(nearest)
+                end
+            end
+        end)
 end
 
--- ============================================
---   РУЧНОЙ СТАРТ РЕМОНТА
--- ============================================
-function GeneratorBoost:StartRepairOnTarget(generator)
-    if not generator or not generator.Parent then 
-        print("[GeneratorBoost] ⚠️ Invalid generator!")
-        return 
-    end
-    
-    local progress = generator:GetAttribute("RepairProgress") or generator:GetAttribute("Progress") or 0
-    if progress and progress >= 100 then
-        print("[GeneratorBoost] ⚠️ Generator already completed!")
-        return
-    end
-    
-    if self.IsRepairing and self.CurrentTarget == generator then
-        print("[GeneratorBoost] ⚠️ Already repairing this generator!")
-        return
-    end
-    
-    self:StopRepair()
-    StartRepairLoop(generator)
-end
+-- ============================================================
+-- FIND NEAREST GENERATOR
+-- ============================================================
 
--- ============================================
---   ПОИСК БЛИЖАЙШЕГО ГЕНЕРАТОРА
--- ============================================
 function GeneratorBoost:GetNearestGenerator()
-    local character = LocalPlayer.Character
-    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return nil end
-    
-    local Map = Workspace:FindFirstChild("Map") or Workspace
-    if not Map then return nil end
-    
+    local rootPart = getRootPart()
+
+    if not rootPart then
+        return nil, math.huge
+    end
+
     local nearest = nil
     local nearestDist = math.huge
-    
-    -- Ищем во всем Workspace
-    local allObjects = Workspace:GetDescendants()
-    for _, obj in ipairs(allObjects) do
-        -- Проверяем, является ли объект генератором
-        local isGenerator = obj.Name == "Generator" and obj:IsA("Model")
-        
-        if isGenerator then
-            local progress = obj:GetAttribute("RepairProgress") or obj:GetAttribute("Progress") or 0
+
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj.Name == "Generator" then
+            local progress = getProgress(obj)
+
             if progress < 100 then
-                -- Ищем центр генератора
-                local centerPart = obj:FindFirstChild("defaultMaterial", true) 
-                    or obj:FindFirstChildWhichIsA("Part")
-                    or obj:FindFirstChildWhichIsA("MeshPart")
-                
-                if centerPart then
-                    local dist = (centerPart.Position - rootPart.Position).Magnitude
+                local centerPart =
+                    obj.PrimaryPart
+                    or obj:FindFirstChild("defaultMaterial", true)
+                    or obj:FindFirstChildWhichIsA("BasePart", true)
+
+                if centerPart and centerPart:IsA("BasePart") then
+                    local dist =
+                        (centerPart.Position - rootPart.Position).Magnitude
+
                     if dist < nearestDist then
                         nearestDist = dist
                         nearest = obj
@@ -344,17 +512,35 @@ function GeneratorBoost:GetNearestGenerator()
             end
         end
     end
-    
+
     return nearest, nearestDist
 end
 
--- ============================================
---   ЭКСПОРТ
--- ============================================
+-- ============================================================
+-- CHARACTER CLEANUP
+-- ============================================================
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.15)
+
+    if GeneratorBoost.IsRepairing then
+        print("[GeneratorBoost] 🔄 Character changed; stopping repair")
+        GeneratorBoost:StopRepair()
+    end
+end)
+
+-- ============================================================
+-- EXPORT
+-- ============================================================
+
 _G.GeneratorBoost = GeneratorBoost
 
 print("[GeneratorBoost] ✅ Loaded!")
-print("[GeneratorBoost] 💡 Use _G.GeneratorBoost:Toggle() to enable/disable")
-print("[GeneratorBoost] 💡 Use _G.GeneratorBoost:StartRepairOnTarget(generator) to start repair")
+print(
+    "[GeneratorBoost] 💡 Multiplier:",
+    "x" .. tostring(GeneratorBoost.Multiplier)
+)
+print("[GeneratorBoost] 💡 UI-compatible SetEnabled/Toggle ready")
+print("[GeneratorBoost] 💡 RepairEvent:", RepairEvent and "READY" or "MISSING")
 
 return GeneratorBoost
