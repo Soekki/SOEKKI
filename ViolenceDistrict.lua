@@ -33,7 +33,7 @@ end
 boost()
 print("[SOEKKI] ✅ generator_boost loaded!")
 
--- 3. Загружаем функции
+-- 3. Загружаем функции (без дублирующей загрузки generator_boost)
 local functionsCode = loadModule(BASE_URL .. "main_functions.lua")
 local func, funcErr = loadstring(functionsCode)
 if not func then

@@ -96,7 +96,6 @@ end
 --   ФУНКЦИЯ ПОДСВЕТКИ (РАБОТАЕТ ОТДЕЛЬНО ОТ PLAYERS)
 -- ============================================
 local function ApplyHighlight(object, color)
-    -- НЕ проверяем ShowPlayers здесь!
     local h = object:FindFirstChild("H") or Instance.new("Highlight")
     h.Name = "H"
     h.Adornee = object
@@ -108,7 +107,6 @@ local function ApplyHighlight(object, color)
     h.Parent = object
 end
 
--- Удаляем старый ApplyHighlight для объектов (если есть)
 local function RemoveHighlight(object)
     local h = object:FindFirstChild("H")
     if h then h:Destroy() end
@@ -143,7 +141,6 @@ end
 local function updatePlayerNametag(player)
     if not IndicatorGui or not IndicatorGui.Parent then return end
     
-    -- Если ShowPlayers выключен - удаляем всё
     if not ESPConfig.ShowPlayers then
         local toRemove = {}
         for _, child in ipairs(IndicatorGui:GetChildren()) do
@@ -216,7 +213,6 @@ local function updatePlayerNametag(player)
         end
     end
     
-    -- Подсветка игрока (используем ApplyHighlight, но НЕ проверяем ShowPlayers)
     ApplyHighlight(player.Character, color)
 
     local hasMask = false
@@ -254,18 +250,27 @@ local function updatePlayerNametag(player)
         if not ct3 then
             ct3 = Instance.new("TextLabel", billboard)
             ct3.Name = "ChasedLabel"
-            ct3.Size, ct3.Position, ct3.BackgroundTransparency = UDim2.new(1,0,1,0), UDim2.new(0,0,-1.2,0), 1
-            ct3.Font, ct3.TextSize = Enum.Font.GothamBold, 24
+            ct3.Size = UDim2.new(1,0,1,0)
+            ct3.Position = UDim2.new(0,0,-1.2,0)
+            ct3.BackgroundTransparency = 1
+            ct3.Font = Enum.Font.GothamBold
+            ct3.TextSize = 24
         end
-        ct3.Text, ct3.TextColor3, ct3.TextStrokeTransparency = "!!", color, 0
+        ct3.Text = "!!"
+        ct3.TextColor3 = color
+        ct3.TextStrokeTransparency = 0
         
         if not chasedLabel2D then
             chasedLabel2D = Instance.new("TextLabel", IndicatorGui)
-            chasedLabel2D.Name, chasedLabel2D.BackgroundTransparency = player.Name .. "_Chased", 1
-            chasedLabel2D.Font, chasedLabel2D.TextSize, chasedLabel2D.TextStrokeTransparency = Enum.Font.GothamBold, 24, 0
+            chasedLabel2D.Name = player.Name .. "_Chased"
+            chasedLabel2D.BackgroundTransparency = 1
+            chasedLabel2D.Font = Enum.Font.GothamBold
+            chasedLabel2D.TextSize = 24
+            chasedLabel2D.TextStrokeTransparency = 0
             chasedLabel2D.AnchorPoint = Vector2.new(0.5, 0.5)
         end
-        chasedLabel2D.Text, chasedLabel2D.TextColor3 = "!!", color
+        chasedLabel2D.Text = "!!"
+        chasedLabel2D.TextColor3 = color
         
         local screenPos, onScreen = workspace.CurrentCamera:WorldToScreenPoint(rootPart.Position)
         if onScreen then
@@ -288,11 +293,17 @@ local function updatePlayerNametag(player)
     if isKiller then
         if not killerLabel2D then
             killerLabel2D = Instance.new("TextLabel", IndicatorGui)
-            killerLabel2D.Name, killerLabel2D.BackgroundTransparency = player.Name .. "_Killer", 1
-            killerLabel2D.Font, killerLabel2D.TextSize, killerLabel2D.TextStrokeTransparency = Enum.Font.GothamBold, 10, 0
-            killerLabel2D.Size, killerLabel2D.RichText, killerLabel2D.AnchorPoint = UDim2.new(0, 120, 0, 30), true, Vector2.new(0.5, 0.5)
+            killerLabel2D.Name = player.Name .. "_Killer"
+            killerLabel2D.BackgroundTransparency = 1
+            killerLabel2D.Font = Enum.Font.GothamBold
+            killerLabel2D.TextSize = 10
+            killerLabel2D.TextStrokeTransparency = 0
+            killerLabel2D.Size = UDim2.new(0, 120, 0, 30)
+            killerLabel2D.RichText = true
+            killerLabel2D.AnchorPoint = Vector2.new(0.5, 0.5)
         end
-        killerLabel2D.Text, killerLabel2D.TextColor3 = baseName .. "\n[" .. distance .. " studs]", color
+        killerLabel2D.Text = baseName .. "\n[" .. distance .. " studs]"
+        killerLabel2D.TextColor3 = color
         
         local screenPos, onScreen = workspace.CurrentCamera:WorldToScreenPoint(rootPart.Position)
         if not onScreen then
@@ -335,7 +346,8 @@ local function updateGeneratorProgress(generator)
     local percentStr = string.format("[%.2f%%]", percent)
     if not billboard then
         billboard = CreateBillboardTag(percentStr, finalColor)
-        billboard.Name, billboard.StudsOffset = "GenBitchHook", Vector3.new(0, 2, 0)
+        billboard.Name = "GenBitchHook"
+        billboard.StudsOffset = Vector3.new(0, 2, 0)
         billboard.Adornee = generator:FindFirstChild("defaultMaterial", true) or generator
         billboard.Parent = generator
     else
@@ -345,7 +357,6 @@ local function updateGeneratorProgress(generator)
             lbl.TextColor3 = finalColor
         end
     end
-    -- Подсветка генератора
     ApplyHighlight(generator, Config.Objects.Generator.Color)
     return false
 end
@@ -360,9 +371,16 @@ local function updateNextKillerDisplay()
     if teamName:find("spectator") or teamName:find("lobby") then
         if not label then
             label = Instance.new("TextLabel", IndicatorGui)
-            label.Name, label.Size, label.Position = "NextKillerDisplay", UDim2.new(0, 220, 0, 30), UDim2.new(0.5, 0, 0, 45)
-            label.AnchorPoint, label.BackgroundTransparency, label.BackgroundColor3 = Vector2.new(0.5, 0), 0.5, Color3.new(0, 0, 0)
-            label.TextColor3, label.Font, label.TextSize, label.RichText = Color3.new(1, 1, 1), Enum.Font.GothamBold, 14, true
+            label.Name = "NextKillerDisplay"
+            label.Size = UDim2.new(0, 220, 0, 30)
+            label.Position = UDim2.new(0.5, 0, 0, 45)
+            label.AnchorPoint = Vector2.new(0.5, 0)
+            label.BackgroundTransparency = 0.5
+            label.BackgroundColor3 = Color3.new(0, 0, 0)
+            label.TextColor3 = Color3.new(1, 1, 1)
+            label.Font = Enum.Font.GothamBold
+            label.TextSize = 14
+            label.RichText = true
             label.Text = "Next Killer: Calculating..."
         end
         local players = Players:GetPlayers()
@@ -384,12 +402,11 @@ local function updateNextKillerDisplay()
 end
 
 -- ============================================
---   ОБНОВЛЕНИЕ ESP (КАЖДАЯ ФУНКЦИЯ ОТДЕЛЬНО)
+--   ОБНОВЛЕНИЕ ESP
 -- ============================================
 local function RefreshESP()
     ActiveGenerators = {}
     
-    -- Windows
     if ESPConfig.ShowWindows then
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj.Name == "Window" then
@@ -408,7 +425,6 @@ local function RefreshESP()
     if not Map then return end
     
     for _, obj in ipairs(Map:GetDescendants()) do
-        -- Generators
         if obj.Name == "Generator" then
             if ESPConfig.ShowGenerators then
                 ApplyHighlight(obj, Config.Objects.Generator.Color)
@@ -416,7 +432,6 @@ local function RefreshESP()
             else
                 RemoveHighlight(obj)
             end
-        -- Hooks
         elseif obj.Name == "Hook" then
             if ESPConfig.ShowHooks then
                 local m = obj:FindFirstChild("Model")
@@ -437,14 +452,12 @@ local function RefreshESP()
                     end
                 end
             end
-        -- Pallets
         elseif (obj.Name == "Palletwrong" or obj.Name == "Pallet") then
             if ESPConfig.ShowPallets then
                 ApplyHighlight(obj, Config.Objects.Pallet.Color)
             else
                 RemoveHighlight(obj)
             end
-        -- Gates
         elseif obj.Name == "Gate" then
             if ESPConfig.ShowGates then
                 ApplyHighlight(obj, Config.Objects.Gate.Color)
@@ -551,7 +564,10 @@ RunService.Heartbeat:Connect(function()
         if killerNearby then
             if not warn then
                 warn = CreateBillboardTag("!", Color3.fromRGB(255, 0, 0), UDim2.new(0, 50, 0, 50), 40)
-                warn.Name, warn.StudsOffset, warn.Adornee, warn.Parent = "KillerWarn", Vector3.new(0, 4, 0), myRoot, myRoot
+                warn.Name = "KillerWarn"
+                warn.StudsOffset = Vector3.new(0, 4, 0)
+                warn.Adornee = myRoot
+                warn.Parent = myRoot
             end
         elseif warn then
             warn:Destroy()
@@ -588,41 +604,5 @@ _G.ToggleESP = module.ToggleESP
 _G.GetESPState = module.GetESPState
 
 print("[SOEKKI] Functions loaded!")
-
-
--- ============================================
---   ЗАГРУЗКА GENERATOR BOOST
--- ============================================
-local function LoadGeneratorBoost()
-    print("[SOEKKI] Loading GeneratorBoost...")
-    
-    -- Проверяем наличие модуля
-    local boostModule = script.Parent:FindFirstChild("generator_boost")
-    if not boostModule then
-        warn("[SOEKKI] ❌ generator_boost.lua not found!")
-        return
-    end
-    
-    local boostFunc, err = loadstring(boostModule:GetFullName())
-    if not boostFunc then
-        warn("[SOEKKI] ❌ Failed to load generator_boost:", err)
-        return
-    end
-    
-    pcall(boostFunc)
-    print("[SOEKKI] ✅ GeneratorBoost loaded!")
-    
-    -- Добавляем функцию в глобальный доступ
-    _G.ToggleGeneratorBoost = function()
-        if _G.GeneratorBoost then
-            return _G.GeneratorBoost:Toggle()
-        end
-        warn("[SOEKKI] ❌ GeneratorBoost not available!")
-        return false
-    end
-end
-
--- Загружаем
-LoadGeneratorBoost()
 
 return module
