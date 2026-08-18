@@ -33,7 +33,7 @@ end
 boost()
 print("[SOEKKI] ✅ generator_boost loaded!")
 
--- 3. Загружаем функции (без дублирующей загрузки generator_boost)
+-- 3. Загружаем функции
 local functionsCode = loadModule(BASE_URL .. "main_functions.lua")
 local func, funcErr = loadstring(functionsCode)
 if not func then
@@ -51,6 +51,14 @@ end
 ui()
 print("[SOEKKI] ✅ main_ui loaded!")
 
+-- 5. Активируем Generator Boost по умолчанию (опционально)
+task.wait(1)
+if _G.GeneratorBoost then
+    _G.GeneratorBoost:Toggle()
+    print("[SOEKKI] 🟢 Generator Boost auto-enabled!")
+end
+
 print("[SOEKKI] 🚀 ALL LOADED!")
-print("[SOEKKI] 💡 Press RightShift to toggle menu.")
-print("[SOEKKI] 💡 Use _G.GeneratorBoost:Toggle() to enable/disable repair boost")
+print("[SOEKKI] 💡 Press RightShift to toggle menu (works everywhere!)")
+print("[SOEKKI] 💡 Use _G.GeneratorBoost:Toggle() to toggle repair boost")
+print("[SOEKKI] 💡 Use _G.GeneratorBoost:StopRepair() to stop repair")

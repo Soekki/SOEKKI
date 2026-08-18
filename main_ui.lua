@@ -1,6 +1,7 @@
--- main_ui.lua - ВСЕ ВКЛАДКИ + ВСЕ КНОПКИ ESP + GENERATOR BOOST
+-- main_ui.lua - ПОЛНАЯ ВЕРСИЯ UI ПОВЕРХ ВСЕГО
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 local player = Players.LocalPlayer
 
 -- ============================================
@@ -21,7 +22,7 @@ local COLORS = {
 }
 
 -- ============================================
---   SCREEN GUI
+--   SCREEN GUI (ПОВЕРХ ВСЕГО, НЕ УДАЛЯЕТСЯ)
 -- ============================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ViolenceMenu"
@@ -31,17 +32,29 @@ screenGui.DisplayOrder = 999999
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
+-- Защита от удаления
+local function ReattachGui()
+    if not screenGui.Parent then
+        screenGui.Parent = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui")
+    end
+end
+
+player.CharacterAdded:Connect(function()
+    task.wait(0.1)
+    ReattachGui()
+end)
+
 -- ============================================
 --   ГЛАВНЫЙ ФРЕЙМ
 -- ============================================
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 650, 0, 480)
-mainFrame.Position = UDim2.new(0.5, -325, 0.5, -240)
+mainFrame.Size = UDim2.new(0, 650, 0, 500)
+mainFrame.Position = UDim2.new(0.5, -325, 0.5, -250)
 mainFrame.BackgroundColor3 = COLORS.Background
 mainFrame.BackgroundTransparency = 0.05
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
-mainFrame.ZIndex = 1000
+mainFrame.ZIndex = 9999
 mainFrame.Parent = screenGui
 
 local corner = Instance.new("UICorner")
@@ -54,7 +67,7 @@ accentBorder.BackgroundColor3 = COLORS.Accent
 accentBorder.BackgroundTransparency = 0.85
 accentBorder.BorderSizePixel = 2
 accentBorder.BorderColor3 = COLORS.Accent
-accentBorder.ZIndex = 1002
+accentBorder.ZIndex = 10002
 accentBorder.Parent = mainFrame
 
 local accentCorner = Instance.new("UICorner")
@@ -69,7 +82,7 @@ titleBar.Size = UDim2.new(1, 0, 0, 35)
 titleBar.BackgroundColor3 = COLORS.Darker
 titleBar.BackgroundTransparency = 0.3
 titleBar.BorderSizePixel = 0
-titleBar.ZIndex = 1003
+titleBar.ZIndex = 10003
 titleBar.Parent = mainFrame
 
 local titleCorner = Instance.new("UICorner")
@@ -82,7 +95,7 @@ titleLine.Position = UDim2.new(0, 0, 1, 0)
 titleLine.BackgroundColor3 = COLORS.Accent
 titleLine.BackgroundTransparency = 0.3
 titleLine.BorderSizePixel = 0
-titleLine.ZIndex = 1004
+titleLine.ZIndex = 10004
 titleLine.Parent = titleBar
 
 local titleLabel = Instance.new("TextLabel")
@@ -94,7 +107,7 @@ titleLabel.TextColor3 = COLORS.Text
 titleLabel.TextSize = 14
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.ZIndex = 1005
+titleLabel.ZIndex = 10005
 titleLabel.Parent = titleBar
 
 local soekkiLabel = Instance.new("TextLabel")
@@ -106,7 +119,7 @@ soekkiLabel.TextColor3 = COLORS.Accent
 soekkiLabel.TextSize = 14
 soekkiLabel.Font = Enum.Font.GothamBold
 soekkiLabel.TextXAlignment = Enum.TextXAlignment.Right
-soekkiLabel.ZIndex = 1006
+soekkiLabel.ZIndex = 10006
 soekkiLabel.Parent = titleBar
 
 local closeButton = Instance.new("TextButton")
@@ -119,7 +132,7 @@ closeButton.TextColor3 = COLORS.TextDim
 closeButton.TextSize = 12
 closeButton.Font = Enum.Font.GothamBold
 closeButton.BorderSizePixel = 0
-closeButton.ZIndex = 1006
+closeButton.ZIndex = 10006
 closeButton.Parent = titleBar
 
 local closeCorner = Instance.new("UICorner")
@@ -191,8 +204,8 @@ contentPadding.Parent = contentArea
 --   БОКОВАЯ ПАНЕЛЬ
 -- ============================================
 local sidebar = Instance.new("Frame")
-sidebar.Size = UDim2.new(0, 140, 0, 310)
-sidebar.Position = UDim2.new(1, -150, 0.5, -155)
+sidebar.Size = UDim2.new(0, 140, 0, 330)
+sidebar.Position = UDim2.new(1, -150, 0.5, -165)
 sidebar.BackgroundColor3 = COLORS.Darker
 sidebar.BackgroundTransparency = 0.2
 sidebar.BorderSizePixel = 0
@@ -290,7 +303,7 @@ local function createTab(name, icon)
 end
 
 -- ============================================
---   СОЗДАНИЕ TOGGLE (ОБНОВЛЕННЫЙ)
+--   СОЗДАНИЕ TOGGLE
 -- ============================================
 local function createToggle(parent, labelText, optionName, customCallback)
 	local container = Instance.new("Frame")
@@ -401,7 +414,6 @@ visualPadding.Parent = visualTab
 visualTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
 visualTab.CanvasSize = UDim2.new(0, 0, 0, 0)
 
--- Заголовок ESP
 local sectionLabel = Instance.new("TextLabel")
 sectionLabel.Size = UDim2.new(1, 0, 0, 25)
 sectionLabel.BackgroundTransparency = 1
@@ -417,7 +429,6 @@ espSpacing.Size = UDim2.new(1, 0, 0, 5)
 espSpacing.BackgroundTransparency = 1
 espSpacing.Parent = visualTab
 
--- ВСЕ КНОПКИ ESP
 createToggle(visualTab, "Generators", "ShowGenerators")
 createToggle(visualTab, "Gates", "ShowGates")
 createToggle(visualTab, "Pallets", "ShowPallets")
@@ -426,7 +437,6 @@ createToggle(visualTab, "Hooks", "ShowHooks")
 createToggle(visualTab, "Players", "ShowPlayers")
 createToggle(visualTab, "Killer Warning", "ShowKillerWarning")
 
--- Разделитель
 local divider = Instance.new("Frame")
 divider.Size = UDim2.new(1, 0, 0, 1)
 divider.BackgroundColor3 = COLORS.Darker
@@ -438,7 +448,6 @@ miscSpacing.Size = UDim2.new(1, 0, 0, 10)
 miscSpacing.BackgroundTransparency = 1
 miscSpacing.Parent = visualTab
 
--- Заголовок Misc
 local sectionLabel2 = Instance.new("TextLabel")
 sectionLabel2.Size = UDim2.new(1, 0, 0, 25)
 sectionLabel2.BackgroundTransparency = 1
@@ -493,7 +502,7 @@ createToggle(movementTab, "No Stun", "NoStun")
 createToggle(movementTab, "Auto Moonwalk", "AutoMoonwalk")
 
 -- ============================================
---   ВКЛАДКА MODIFICATION (С GENERATOR BOOST)
+--   ВКЛАДКА MODIFICATION (АНИМАЦИИ + GENERATOR BOOST)
 -- ============================================
 local modTab = tabs["Modification"]
 
@@ -512,9 +521,7 @@ modPadding.Parent = modTab
 modTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
 modTab.CanvasSize = UDim2.new(0, 0, 0, 0)
 
--- ============================================
---   ANIMATIONS (уже было)
--- ============================================
+-- Animations
 local animTitle = Instance.new("TextLabel")
 animTitle.Size = UDim2.new(1, 0, 0, 25)
 animTitle.BackgroundTransparency = 1
@@ -662,11 +669,7 @@ player.CharacterAdded:Connect(function()
     stopMenuAnimation()
 end)
 
--- ============================================
---   GENERATOR BOOST (НОВЫЙ БЛОК)
--- ============================================
-
--- Разделитель
+-- Разделитель перед Generator Boost
 local genDivider = Instance.new("Frame")
 genDivider.Size = UDim2.new(1, 0, 0, 1)
 genDivider.BackgroundColor3 = COLORS.Darker
@@ -767,11 +770,12 @@ genToggleBtn.MouseButton1Click:Connect(function()
     updateGenToggle(newState)
     
     if _G.GeneratorBoost then
-        _G.GeneratorBoost.Enabled = newState
         if newState then
+            _G.GeneratorBoost.Enabled = true
             _G.GeneratorBoost:Toggle()
             print("[UI] 🟢 Generator Boost ENABLED!")
         else
+            _G.GeneratorBoost.Enabled = false
             _G.GeneratorBoost:Toggle()
             print("[UI] 🔴 Generator Boost DISABLED!")
         end
@@ -801,7 +805,7 @@ repairNearestBtn.MouseButton1Click:Connect(function()
     if _G.GeneratorBoost then
         local nearest, dist = _G.GeneratorBoost:GetNearestGenerator()
         if nearest then
-            print("[UI] 🔧 Starting repair on nearest generator (distance: " .. dist .. ")")
+            print("[UI] 🔧 Starting repair on nearest generator (distance: " .. tostring(dist) .. ")")
             _G.GeneratorBoost:StartRepairOnTarget(nearest)
         else
             print("[UI] ⚠️ No generators found nearby!")
@@ -830,7 +834,7 @@ stopRepairCorner.Parent = stopRepairBtn
 
 stopRepairBtn.MouseButton1Click:Connect(function()
     if _G.GeneratorBoost then
-        _G.GeneratorBoost.StopRepair()
+        _G.GeneratorBoost:StopRepair()
         print("[UI] ⏹ Repair stopped!")
     end
 end)
@@ -846,7 +850,6 @@ statusLabel.Font = Enum.Font.Gotham
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.Parent = modTab
 
--- Обновление статуса
 local function updateStatus()
     if _G.GeneratorBoost and _G.GeneratorBoost.IsRepairing then
         statusLabel.Text = "Status: ⚡ Repairing..."
@@ -857,7 +860,6 @@ local function updateStatus()
     end
 end
 
--- Обновляем статус каждые 0.5 секунды
 game:GetService("RunService").Heartbeat:Connect(function()
     if mainFrame.Visible then
         updateStatus()
@@ -1019,10 +1021,10 @@ unloadCorner.Parent = unloadBtn
 
 unloadBtn.MouseButton1Click:Connect(function()
     print("[UI] ⚠ Unloading...")
-    screenGui:Destroy()
     if _G.GeneratorBoost then
-        _G.GeneratorBoost.StopRepair()
+        _G.GeneratorBoost:StopRepair()
     end
+    screenGui:Destroy()
     print("[UI] ✅ Unloaded!")
 end)
 
@@ -1059,12 +1061,25 @@ if #tabButtons > 0 then
 end
 
 -- ============================================
---   ХОТКЕЙ
+--   ХОТКЕЙ (РАБОТАЕТ ПОВЕРХ ВСЕГО)
 -- ============================================
+ContextActionService:BindActionAtPriority(
+	"ToggleMenu",
+	function(actionName, inputState, inputObject)
+		if inputState == Enum.UserInputState.Begin then
+			mainFrame.Visible = not mainFrame.Visible
+		end
+	end,
+	false,
+	Enum.ContextActionPriority.High.Value,
+	Enum.KeyCode.RightShift
+)
+
+-- Дополнительный биндинг через UserInputService
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if not gameProcessed and input.KeyCode == Enum.KeyCode.RightShift then
+	if input.KeyCode == Enum.KeyCode.RightShift then
 		mainFrame.Visible = not mainFrame.Visible
 	end
 end)
 
-print("[SOEKKI] UI loaded! Press RightShift to toggle.")
+print("[SOEKKI] UI loaded! Press RightShift to toggle (works everywhere).")
