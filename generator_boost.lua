@@ -172,9 +172,9 @@ local function StartRepairLoop(generator)
     
     print("[GeneratorBoost] ⚡ Starting repair loop on generator:", generator.Name)
     
-    local eventsPerCycle = 5  -- Количество событий за цикл
+    local eventsPerCycle = 5
     local lastSend = 0
-    local interval = 0.03  -- Интервал между отправками (очень быстро!)
+    local interval = 0.03
     
     -- Основной цикл
     GeneratorBoost.RepairLoopConnection = RunService.Heartbeat:Connect(function()
@@ -202,13 +202,11 @@ local function StartRepairLoop(generator)
         if now - lastSend >= interval then
             lastSend = now
             
-            -- Отправляем несколько событий за раз
             for i = 1, eventsPerCycle do
                 SendRepairEvent(generator, character)
                 SendRepairAnim(generator, character)
             end
             
-            -- Фиксируем прогресс
             SendRepairCommit(generator, character)
         end
     end)
@@ -244,12 +242,10 @@ function GeneratorBoost:Toggle()
     
     if self.Enabled then
         print("[GeneratorBoost] 🟢 Boost ENABLED!")
-        -- Автоматический поиск ближайшего генератора
         local nearest = self:GetNearestGenerator()
         if nearest then
             self:StartRepairOnTarget(nearest)
         else
-            -- Запускаем сканирование
             self:StartAutoScan()
         end
     else
@@ -327,26 +323,26 @@ function GeneratorBoost:GetNearestGenerator()
     -- Ищем во всем Workspace
     local allObjects = Workspace:GetDescendants()
     for _, obj in ipairs(allObjects) do
-        if obj.Name == "Generator" and obj:IsA("Model") then
+        -- Проверяем, является ли объект генератором
+        local isGenerator = obj.Name == "Generator" and obj:IsA("Model")
+        
+        if isGenerator then
             local progress = obj:GetAttribute("RepairProgress") or obj:GetAttribute("Progress") or 0
-            if progress >= 100 then 
-                goto continue
-            end
-            
-            -- Ищем центр генератора
-            local centerPart = obj:FindFirstChild("defaultMaterial", true) 
-                or obj:FindFirstChildWhichIsA("Part")
-                or obj:FindFirstChildWhichIsA("MeshPart")
-            
-            if not centerPart then goto continue end
-            
-            local dist = (centerPart.Position - rootPart.Position).Magnitude
-            if dist < nearestDist then
-                nearestDist = dist
-                nearest = obj
+            if progress < 100 then
+                -- Ищем центр генератора
+                local centerPart = obj:FindFirstChild("defaultMaterial", true) 
+                    or obj:FindFirstChildWhichIsA("Part")
+                    or obj:FindFirstChildWhichIsA("MeshPart")
+                
+                if centerPart then
+                    local dist = (centerPart.Position - rootPart.Position).Magnitude
+                    if dist < nearestDist then
+                        nearestDist = dist
+                        nearest = obj
+                    end
+                end
             end
         end
-        ::continue::
     end
     
     return nearest, nearestDist
