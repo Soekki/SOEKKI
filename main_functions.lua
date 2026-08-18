@@ -1,19 +1,13 @@
--- main_functions.lua - ИСПОЛЬЗУЕМ ОРИГИНАЛЬНЫЙ ОБРАБОТЧИК
+-- main_functions.lua - ПОЛНАЯ ВЕРСИЯ С РАЗДЕЛЬНЫМИ НАСТРОЙКАМИ
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CollectionService = game:GetService("CollectionService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-print("[SOEKKI] ========================================")
-print("[SOEKKI] ЗАГРУЗКА main_functions.lua (v2)")
-print("[SOEKKI] ========================================")
-
 -- ============================================
---   НАСТРОЙКИ ESP
+--   НАСТРОЙКИ ESP (КАЖДАЯ ОТДЕЛЬНО)
 -- ============================================
 local ESPConfig = {
     ShowGenerators = true,
@@ -24,14 +18,6 @@ local ESPConfig = {
     ShowPlayers = true,
     ShowKillerWarning = true,
     FullBright = true,
-}
-
--- ============================================
---   НАСТРОЙКИ БАФФА ГЕНЕРАТОРОВ
--- ============================================
-local GeneratorBoostConfig = {
-    Enabled = false,
-    BoostPercent = 50,
 }
 
 -- ============================================
@@ -77,252 +63,6 @@ local LastFullESPRefresh = 0
 local IndicatorGui = nil
 
 -- ============================================
---   СИСТЕМА БАФФА - НОВЫЙ ПОДХОД
--- ============================================
-local activeBoosts = {}
-local originalRepairAnimHandler = nil
-local repairAnimConnection = nil
-local currentGenerator = nil
-local isRepairing = false
-
--- Получаем ремоуты
-local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
-local Generator = Remotes and Remotes:FindFirstChild("Generator")
-local RepairAnim = Generator and Generator:FindFirstChild("RepairAnim")
-local RepairEvent = Generator and Generator:FindFirstChild("RepairEvent")
-
-print("[SOEKKI] RepairAnim найден:", RepairAnim ~= nil)
-print("[SOEKKI] RepairAnim uniqueid:", RepairAnim and RepairAnim:GetAttribute("uniqueid") or "none")
-print("[SOEKKI] RepairEvent найден:", RepairEvent ~= nil)
-
--- ============================================
---   МЕТОД 1: ПЕРЕХВАТ ОРИГИНАЛЬНОГО ОБРАБОТЧИКА
--- ============================================
-local function hookOriginalHandler()
-    print("[SOEKKI] [hookOriginalHandler] Пытаемся перехватить оригинальный обработчик...")
-    
-    -- Ищем скрипты, которые подписываются на RepairAnim
-    local scripts = {}
-    
-    -- Проверяем все скрипты в ReplicatedStorage
-    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
-            table.insert(scripts, obj)
-        end
-    end
-    
-    -- Проверяем все скрипты в Workspace
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
-            table.insert(scripts, obj)
-        end
-    end
-    
-    print("[SOEKKI] Найдено скриптов:", #scripts)
-    
-    -- Ищем скрипт, который содержит "RepairAnim"
-    for _, script in ipairs(scripts) do
-        local source = script:FindFirstChild("Source") or script:FindFirstChild("Value")
-        if source then
-            local text = source.Value or ""
-            if string.find(text, "RepairAnim") then
-                print("[SOEKKI] Найден скрипт с RepairAnim:", script:GetFullName())
-            end
-        end
-    end
-end
-
--- ============================================
---   МЕТОД 2: ИСПОЛЬЗУЕМ МОНИТОРИНГ АТРИБУТОВ
--- ============================================
-local function monitorGenerators()
-    print("[SOEKKI] [monitorGenerators] Запуск...")
-    
-    while true do
-        if GeneratorBoostConfig.Enabled then
-            local allGenerators = CollectionService:GetTagged("Generator")
-            
-            for _, generator in ipairs(allGenerators) do
-                if generator:IsDescendantOf(workspace) then
-                    -- Получаем атрибуты
-                    local playersRepairing = 0
-                    local repairProgress = 0
-                    
-                    pcall(function()
-                        local count = generator:GetAttribute("PlayersRepairingCount")
-                        if count ~= nil and type(count) == "number" then
-                            playersRepairing = count
-                        end
-                        
-                        local progress = generator:GetAttribute("RepairProgress")
-                        if progress ~= nil and type(progress) == "number" then
-                            repairProgress = progress
-                        end
-                    end)
-                    
-                    -- Если генератор чинится
-                    if playersRepairing > 0 and repairProgress < 100 then
-                        if not activeBoosts[generator] then
-                            print("[SOEKKI] 🟢 Генератор чинится:", generator.Name)
-                            print("[SOEKKI]    PlayersRepairingCount:", playersRepairing)
-                            print("[SOEKKI]    RepairProgress:", string.format("%.1f%%", repairProgress))
-                            
-                            -- Применяем бафф через атрибуты
-                            local boostMultiplier = 1 + (GeneratorBoostConfig.BoostPercent / 100)
-                            
-                            pcall(function()
-                                generator:SetAttribute("repairboost", boostMultiplier)
-                                generator:SetAttribute("BoostMultiplier", boostMultiplier)
-                                generator:SetAttribute("RepairBoost", boostMultiplier)
-                                generator:SetAttribute("GeneratorBoost", boostMultiplier)
-                                
-                                -- Также на все части
-                                for _, part in ipairs(generator:GetDescendants()) do
-                                    if part:IsA("BasePart") then
-                                        part:SetAttribute("repairboost", boostMultiplier)
-                                    end
-                                end
-                            end)
-                            
-                            activeBoosts[generator] = boostMultiplier
-                            print("[SOEKKI] ✅ Бафф применен: x" .. string.format("%.2f", boostMultiplier))
-                        end
-                    elseif activeBoosts[generator] then
-                        -- Если перестали чинить
-                        print("[SOEKKI] 🔴 Генератор больше не чинится:", generator.Name)
-                        
-                        pcall(function()
-                            generator:SetAttribute("repairboost", nil)
-                            generator:SetAttribute("BoostMultiplier", nil)
-                            generator:SetAttribute("RepairBoost", nil)
-                            generator:SetAttribute("GeneratorBoost", nil)
-                            
-                            for _, part in ipairs(generator:GetDescendants()) do
-                                if part:IsA("BasePart") then
-                                    part:SetAttribute("repairboost", nil)
-                                end
-                            end
-                        end)
-                        
-                        activeBoosts[generator] = nil
-                        print("[SOEKKI] ❌ Бафф снят")
-                    end
-                end
-            end
-        else
-            -- Если бафф выключен - чистим всё
-            for generator, _ in pairs(activeBoosts) do
-                pcall(function()
-                    generator:SetAttribute("repairboost", nil)
-                    generator:SetAttribute("BoostMultiplier", nil)
-                    generator:SetAttribute("RepairBoost", nil)
-                    generator:SetAttribute("GeneratorBoost", nil)
-                end)
-            end
-            table.clear(activeBoosts)
-        end
-        
-        task.wait(0.3)
-    end
-end
-
--- ============================================
---   МЕТОД 3: ПЕРЕХВАТ RepairedEvent
--- ============================================
-local function setupRepairEvent()
-    if RepairEvent then
-        print("[SOEKKI] [setupRepairEvent] Подключаем RepairEvent...")
-        
-        -- Сохраняем оригинальные обработчики
-        local connections = {}
-        
-        -- Создаем новый обработчик
-        RepairEvent.OnClientEvent:Connect(function(repairPoint, isRepairing, ...)
-            print("[SOEKKI] [RepairEvent] Вызван!")
-            print("[SOEKKI]    repairPoint:", repairPoint)
-            print("[SOEKKI]    isRepairing:", isRepairing)
-            
-            if repairPoint and repairPoint.Parent then
-                local generator = repairPoint.Parent
-                print("[SOEKKI]    generator:", generator and generator.Name or "nil")
-                
-                if generator and CollectionService:HasTag(generator, "Generator") then
-                    currentGenerator = generator
-                    
-                    if isRepairing and GeneratorBoostConfig.Enabled then
-                        local boostMultiplier = 1 + (GeneratorBoostConfig.BoostPercent / 100)
-                        pcall(function()
-                            generator:SetAttribute("repairboost", boostMultiplier)
-                            generator:SetAttribute("BoostMultiplier", boostMultiplier)
-                        end)
-                        activeBoosts[generator] = boostMultiplier
-                        print("[SOEKKI] ✅ Бафф применен через RepairEvent")
-                    elseif not isRepairing then
-                        pcall(function()
-                            generator:SetAttribute("repairboost", nil)
-                            generator:SetAttribute("BoostMultiplier", nil)
-                        end)
-                        activeBoosts[generator] = nil
-                        print("[SOEKKI] ❌ Бафф снят через RepairEvent")
-                    end
-                end
-            end
-        end)
-    end
-end
-
--- ============================================
---   МЕТОД 4: ПРЯМОЙ ДОСТУП К ИГРЕ (для отладки)
--- ============================================
-local function debugGeneratorState()
-    print("[SOEKKI] ========================================")
-    print("[SOEKKI] [debugGeneratorState] ТЕКУЩЕЕ СОСТОЯНИЕ:")
-    
-    local allGenerators = CollectionService:GetTagged("Generator")
-    print("[SOEKKI] Всего генераторов:", #allGenerators)
-    
-    for _, gen in ipairs(allGenerators) do
-        if gen:IsDescendantOf(workspace) then
-            local progress = gen:GetAttribute("RepairProgress") or 0
-            local count = gen:GetAttribute("PlayersRepairingCount") or 0
-            local boost = gen:GetAttribute("repairboost") or "none"
-            
-            print("[SOEKKI]   -", gen.Name)
-            print("[SOEKKI]       Progress:", string.format("%.1f%%", progress))
-            print("[SOEKKI]       PlayersRepairingCount:", count)
-            print("[SOEKKI]       repairboost:", boost)
-            print("[SOEKKI]       В activeBoosts:", activeBoosts[gen] ~= nil)
-        end
-    end
-    
-    print("[SOEKKI] ========================================")
-end
-
--- ============================================
---   ЗАПУСК ВСЕХ СИСТЕМ
--- ============================================
--- Запускаем мониторинг
-task.spawn(monitorGenerators)
-
--- Подключаем RepairEvent
-task.spawn(setupRepairEvent)
-
--- Перехват оригинального обработчика
-task.spawn(hookOriginalHandler)
-
--- Дебаг команды в консоли
--- Можно вызвать через _G.debugGenerators()
-_G.debugGenerators = debugGeneratorState
-
--- Выводим справку
-print("[SOEKKI] ========================================")
-print("[SOEKKI] СИСТЕМА ЗАГРУЖЕНА!")
-print("[SOEKKI] ========================================")
-print("[SOEKKI] Для отладки используйте:")
-print("[SOEKKI]   _G.debugGenerators() - показать состояние всех генераторов")
-print("[SOEKKI] ========================================")
-
--- ============================================
 --   GUI ДЛЯ ESP
 -- ============================================
 local function SetupGui()
@@ -353,10 +93,10 @@ local function GetGameValue(obj, name)
 end
 
 -- ============================================
---   ФУНКЦИЯ ПОДСВЕТКИ
+--   ФУНКЦИЯ ПОДСВЕТКИ (РАБОТАЕТ ОТДЕЛЬНО ОТ PLAYERS)
 -- ============================================
 local function ApplyHighlight(object, color)
-    if not object then return end
+    -- НЕ проверяем ShowPlayers здесь!
     local h = object:FindFirstChild("H") or Instance.new("Highlight")
     h.Name = "H"
     h.Adornee = object
@@ -368,8 +108,8 @@ local function ApplyHighlight(object, color)
     h.Parent = object
 end
 
+-- Удаляем старый ApplyHighlight для объектов (если есть)
 local function RemoveHighlight(object)
-    if not object then return end
     local h = object:FindFirstChild("H")
     if h then h:Destroy() end
 end
@@ -398,10 +138,12 @@ local function CreateBillboardTag(text, color, size, textSize)
 end
 
 -- ============================================
---   ОБНОВЛЕНИЕ ИГРОКОВ (СОКРАЩЕНО)
+--   ОБНОВЛЕНИЕ ИГРОКОВ
 -- ============================================
 local function updatePlayerNametag(player)
     if not IndicatorGui or not IndicatorGui.Parent then return end
+    
+    -- Если ShowPlayers выключен - удаляем всё
     if not ESPConfig.ShowPlayers then
         local toRemove = {}
         for _, child in ipairs(IndicatorGui:GetChildren()) do
@@ -409,7 +151,9 @@ local function updatePlayerNametag(player)
                 table.insert(toRemove, child)
             end
         end
-        for _, child in ipairs(toRemove) do child:Destroy() end
+        for _, child in ipairs(toRemove) do
+            child:Destroy()
+        end
         if player.Character then
             local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
             if rootPart then
@@ -423,7 +167,13 @@ local function updatePlayerNametag(player)
         end
         return 
     end
-    if not player.Character then return end
+    
+    if not player.Character then
+        local m = IndicatorGui:FindFirstChild(player.Name) if m then m:Destroy() end
+        local c = IndicatorGui:FindFirstChild(player.Name .. "_Chased") if c then c:Destroy() end
+        local k = IndicatorGui:FindFirstChild(player.Name .. "_Killer") if k then k:Destroy() end
+        return 
+    end
     
     local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
     local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
@@ -434,6 +184,7 @@ local function updatePlayerNametag(player)
     local rawMask = GetGameValue(player, "Mask") or GetGameValue(player.Character, "Mask")
     local isKnocked = GetGameValue(player.Character, "Knocked")
     local isHooked = GetGameValue(player.Character, "IsHooked")
+    local isChased = GetGameValue(player.Character, "IsChased")
     
     local isKiller = teamName:find("killer") ~= nil
     local color = isKiller and Config.Players.Killer.Color or Config.Players.Survivor.Color
@@ -450,6 +201,7 @@ local function updatePlayerNametag(player)
     end
     
     local baseName = (isKiller and selectedKillerAttr and tostring(selectedKillerAttr) ~= "") and tostring(selectedKillerAttr) or player.Name
+    
     local billboard = rootPart:FindFirstChild("BitchHook")
     local nameText = baseName .. "\n[" .. distance .. " studs]"
     if not billboard then
@@ -463,7 +215,97 @@ local function updatePlayerNametag(player)
             lbl.TextColor3 = color
         end
     end
+    
+    -- Подсветка игрока (используем ApplyHighlight, но НЕ проверяем ShowPlayers)
     ApplyHighlight(player.Character, color)
+
+    local hasMask = false
+    if isKiller and string.match(tostring(selectedKillerAttr):lower(), "masked") and rawMask then
+        local searchMask = tostring(rawMask):lower()
+        for key, name in pairs(MaskNames) do
+            if key:lower() == searchMask then
+                hasMask = true
+                local maskBillboard = rootPart:FindFirstChild("MaskHook")
+                if not maskBillboard then
+                    maskBillboard = CreateBillboardTag(name, MaskColors[key] or Color3.new(1,1,1), UDim2.new(0, 100, 0, 20), 12)
+                    maskBillboard.Name = "MaskHook"
+                    maskBillboard.StudsOffset = Vector3.new(0, 3, 0)
+                    maskBillboard.Adornee = rootPart
+                    maskBillboard.Parent = rootPart
+                else
+                    local lbl = maskBillboard:FindFirstChild("BitchHook") or maskBillboard:FindFirstChildOfClass("TextLabel")
+                    if lbl then
+                        lbl.Text = name
+                        lbl.TextColor3 = MaskColors[key] or Color3.new(1,1,1)
+                    end
+                end
+                break
+            end
+        end
+    end
+    if not hasMask then
+        local maskBillboard = rootPart:FindFirstChild("MaskHook")
+        if maskBillboard then maskBillboard:Destroy() end
+    end
+
+    local chasedLabel2D = IndicatorGui:FindFirstChild(player.Name .. "_Chased")
+    if isChased then
+        local ct3 = billboard:FindFirstChild("ChasedLabel")
+        if not ct3 then
+            ct3 = Instance.new("TextLabel", billboard)
+            ct3.Name = "ChasedLabel"
+            ct3.Size, ct3.Position, ct3.BackgroundTransparency = UDim2.new(1,0,1,0), UDim2.new(0,0,-1.2,0), 1
+            ct3.Font, ct3.TextSize = Enum.Font.GothamBold, 24
+        end
+        ct3.Text, ct3.TextColor3, ct3.TextStrokeTransparency = "!!", color, 0
+        
+        if not chasedLabel2D then
+            chasedLabel2D = Instance.new("TextLabel", IndicatorGui)
+            chasedLabel2D.Name, chasedLabel2D.BackgroundTransparency = player.Name .. "_Chased", 1
+            chasedLabel2D.Font, chasedLabel2D.TextSize, chasedLabel2D.TextStrokeTransparency = Enum.Font.GothamBold, 24, 0
+            chasedLabel2D.AnchorPoint = Vector2.new(0.5, 0.5)
+        end
+        chasedLabel2D.Text, chasedLabel2D.TextColor3 = "!!", color
+        
+        local screenPos, onScreen = workspace.CurrentCamera:WorldToScreenPoint(rootPart.Position)
+        if onScreen then
+            chasedLabel2D.Visible = false 
+        else
+            chasedLabel2D.Visible = true
+            local viewportCenter = workspace.CurrentCamera.ViewportSize / 2
+            local direction = Vector2.new(screenPos.X, screenPos.Y) - viewportCenter
+            if screenPos.Z < 0 then direction = -direction end
+            local maxScale = math.max(math.abs(direction.X) / (viewportCenter.X - 30), math.abs(direction.Y) / (viewportCenter.Y - 30))
+            chasedLabel2D.Position = UDim2.new(0, viewportCenter.X + direction.X / (maxScale == 0 and 1 or maxScale), 0, viewportCenter.Y + direction.Y / (maxScale == 0 and 1 or maxScale))
+        end
+    else
+        if chasedLabel2D then chasedLabel2D:Destroy() end
+        local ct3 = billboard:FindFirstChild("ChasedLabel")
+        if ct3 then ct3:Destroy() end
+    end
+
+    local killerLabel2D = IndicatorGui:FindFirstChild(player.Name .. "_Killer")
+    if isKiller then
+        if not killerLabel2D then
+            killerLabel2D = Instance.new("TextLabel", IndicatorGui)
+            killerLabel2D.Name, killerLabel2D.BackgroundTransparency = player.Name .. "_Killer", 1
+            killerLabel2D.Font, killerLabel2D.TextSize, killerLabel2D.TextStrokeTransparency = Enum.Font.GothamBold, 10, 0
+            killerLabel2D.Size, killerLabel2D.RichText, killerLabel2D.AnchorPoint = UDim2.new(0, 120, 0, 30), true, Vector2.new(0.5, 0.5)
+        end
+        killerLabel2D.Text, killerLabel2D.TextColor3 = baseName .. "\n[" .. distance .. " studs]", color
+        
+        local screenPos, onScreen = workspace.CurrentCamera:WorldToScreenPoint(rootPart.Position)
+        if not onScreen then
+            killerLabel2D.Visible = true
+            local viewportCenter = workspace.CurrentCamera.ViewportSize / 2
+            local direction = Vector2.new(screenPos.X, screenPos.Y) - viewportCenter
+            if screenPos.Z < 0 then direction = -direction end
+            local maxScale = math.max(math.abs(direction.X) / (viewportCenter.X - 30), math.abs(direction.Y) / (viewportCenter.Y - 30))
+            killerLabel2D.Position = UDim2.new(0, viewportCenter.X + direction.X / (maxScale == 0 and 1 or maxScale), 0, viewportCenter.Y + direction.Y / (maxScale == 0 and 1 or maxScale))
+        else
+            killerLabel2D.Visible = false
+        end
+    elseif killerLabel2D then killerLabel2D:Destroy() end
 end
 
 -- ============================================
@@ -503,20 +345,70 @@ local function updateGeneratorProgress(generator)
             lbl.TextColor3 = finalColor
         end
     end
+    -- Подсветка генератора
     ApplyHighlight(generator, Config.Objects.Generator.Color)
     return false
 end
 
 -- ============================================
---   ОБНОВЛЕНИЕ ESP
+--   NEXT KILLER DISPLAY
+-- ============================================
+local function updateNextKillerDisplay()
+    if not IndicatorGui or not IndicatorGui.Parent then return end
+    local label = IndicatorGui:FindFirstChild("NextKillerDisplay")
+    local teamName = (LocalPlayer.Team and LocalPlayer.Team.Name:lower()) or ""
+    if teamName:find("spectator") or teamName:find("lobby") then
+        if not label then
+            label = Instance.new("TextLabel", IndicatorGui)
+            label.Name, label.Size, label.Position = "NextKillerDisplay", UDim2.new(0, 220, 0, 30), UDim2.new(0.5, 0, 0, 45)
+            label.AnchorPoint, label.BackgroundTransparency, label.BackgroundColor3 = Vector2.new(0.5, 0), 0.5, Color3.new(0, 0, 0)
+            label.TextColor3, label.Font, label.TextSize, label.RichText = Color3.new(1, 1, 1), Enum.Font.GothamBold, 14, true
+            label.Text = "Next Killer: Calculating..."
+        end
+        local players = Players:GetPlayers()
+        
+        table.sort(players, function(a, b)
+            local aA = GetGameValue(a, "AllowKiller") or false
+            local bA = GetGameValue(b, "AllowKiller") or false
+            if aA ~= bA then
+                return aA == true
+            end
+            return (GetGameValue(a, "KillerChance") or 0) > (GetGameValue(b, "KillerChance") or 0)
+        end)
+        
+        local nk = players[1]
+        if nk then
+            label.Text = "Next Killer: <font color=\"rgb(255,0,0)\">" .. (nk == LocalPlayer and "YOU" or tostring(GetGameValue(nk, "SelectedKiller") or nk.Name)) .. "</font>"
+        end
+    elseif label then label:Destroy() end
+end
+
+-- ============================================
+--   ОБНОВЛЕНИЕ ESP (КАЖДАЯ ФУНКЦИЯ ОТДЕЛЬНО)
 -- ============================================
 local function RefreshESP()
     ActiveGenerators = {}
+    
+    -- Windows
+    if ESPConfig.ShowWindows then
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj.Name == "Window" then
+                ApplyHighlight(obj, Config.Objects.Window.Color)
+            end
+        end
+    else
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj.Name == "Window" then
+                RemoveHighlight(obj)
+            end
+        end
+    end
     
     local Map = workspace:FindFirstChild("Map")
     if not Map then return end
     
     for _, obj in ipairs(Map:GetDescendants()) do
+        -- Generators
         if obj.Name == "Generator" then
             if ESPConfig.ShowGenerators then
                 ApplyHighlight(obj, Config.Objects.Generator.Color)
@@ -524,6 +416,7 @@ local function RefreshESP()
             else
                 RemoveHighlight(obj)
             end
+        -- Hooks
         elseif obj.Name == "Hook" then
             if ESPConfig.ShowHooks then
                 local m = obj:FindFirstChild("Model")
@@ -544,12 +437,14 @@ local function RefreshESP()
                     end
                 end
             end
+        -- Pallets
         elseif (obj.Name == "Palletwrong" or obj.Name == "Pallet") then
             if ESPConfig.ShowPallets then
                 ApplyHighlight(obj, Config.Objects.Pallet.Color)
             else
                 RemoveHighlight(obj)
             end
+        -- Gates
         elseif obj.Name == "Gate" then
             if ESPConfig.ShowGates then
                 ApplyHighlight(obj, Config.Objects.Gate.Color)
@@ -561,7 +456,7 @@ local function RefreshESP()
 end
 
 -- ============================================
---   ЭКСПОРТ
+--   ЭКСПОРТ ФУНКЦИЙ
 -- ============================================
 local module = {}
 
@@ -579,35 +474,6 @@ function module.SetESPState(option, state)
     ESPConfig[option] = state
     RefreshESP()
     return ESPConfig[option]
-end
-
-function module.SetGeneratorBoostEnabled(enabled)
-    GeneratorBoostConfig.Enabled = enabled
-    if not enabled then
-        for generator, _ in pairs(activeBoosts) do
-            pcall(function()
-                generator:SetAttribute("repairboost", nil)
-                generator:SetAttribute("BoostMultiplier", nil)
-                generator:SetAttribute("RepairBoost", nil)
-                generator:SetAttribute("GeneratorBoost", nil)
-            end)
-        end
-        table.clear(activeBoosts)
-    end
-    print("[SOEKKI] Generator boost enabled:", enabled)
-end
-
-function module.GetGeneratorBoostEnabled()
-    return GeneratorBoostConfig.Enabled
-end
-
-function module.SetGeneratorBoostPercent(percent)
-    GeneratorBoostConfig.BoostPercent = math.clamp(percent, 0, 100)
-    print("[SOEKKI] Generator boost percent:", GeneratorBoostConfig.BoostPercent .. "%")
-end
-
-function module.GetGeneratorBoostPercent()
-    return GeneratorBoostConfig.BoostPercent
 end
 
 local OriginalLighting = {
@@ -662,11 +528,34 @@ RunService.Heartbeat:Connect(function()
         LastFullESPRefresh = now
         RefreshESP()
     end
+    updateNextKillerDisplay()
+    
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local killerNearby = false
     
     for _, p in ipairs(Players:GetPlayers()) do 
         if p ~= LocalPlayer then 
             updatePlayerNametag(p) 
+            local pTeam = p.Team and p.Team.Name:lower() or ""
+            if pTeam:find("killer") and myRoot and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                if (p.Character.HumanoidRootPart.Position - myRoot.Position).Magnitude < 99 then
+                    killerNearby = true
+                end
+            end
         end 
+    end
+    
+    if myRoot and ESPConfig.ShowKillerWarning then
+        local warn = myRoot:FindFirstChild("KillerWarn")
+        if killerNearby then
+            if not warn then
+                warn = CreateBillboardTag("!", Color3.fromRGB(255, 0, 0), UDim2.new(0, 50, 0, 50), 40)
+                warn.Name, warn.StudsOffset, warn.Adornee, warn.Parent = "KillerWarn", Vector3.new(0, 4, 0), myRoot, myRoot
+            end
+        elseif warn then
+            warn:Destroy()
+        end
     end
     
     for i = #ActiveGenerators, 1, -1 do
@@ -693,21 +582,11 @@ end)
 SetupGui()
 RefreshESP()
 
--- Регистрируем
+-- Регистрируем в глобальном пространстве
 _G.ESPModule = module
 _G.ToggleESP = module.ToggleESP
 _G.GetESPState = module.GetESPState
-_G.SetGeneratorBoostEnabled = module.SetGeneratorBoostEnabled
-_G.GetGeneratorBoostEnabled = module.GetGeneratorBoostEnabled
-_G.SetGeneratorBoostPercent = module.SetGeneratorBoostPercent
-_G.GetGeneratorBoostPercent = module.GetGeneratorBoostPercent
-_G.debugGenerators = debugGeneratorState
 
-print("[SOEKKI] ========================================")
-print("[SOEKKI] ✅ main_functions.lua ЗАГРУЖЕНА!")
-print("[SOEKKI] ========================================")
-print("[SOEKKI] ДЛЯ ОТЛАДКИ:")
-print("[SOEKKI]   _G.debugGenerators() - показать состояние генераторов")
-print("[SOEKKI] ========================================")
+print("[SOEKKI] Functions loaded!")
 
 return module

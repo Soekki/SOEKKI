@@ -1,4 +1,4 @@
--- main_ui.lua - ВСЕ ВКЛАДКИ + ВСЕ КНОПКИ ESP + БАФФ ГЕНЕРАТОРОВ
+-- main_ui.lua - ВСЕ ВКЛАДКИ + ВСЕ КНОПКИ ESP
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
@@ -16,7 +16,6 @@ local COLORS = {
 	ToggleOn = Color3.fromRGB(120, 80, 200),
 	TabActive = Color3.fromRGB(40, 40, 50),
 	TabInactive = Color3.fromRGB(25, 25, 32),
-	InputBg = Color3.fromRGB(35, 35, 45),
 }
 
 -- ============================================
@@ -113,9 +112,9 @@ closeButton.Size = UDim2.new(0, 24, 0, 24)
 closeButton.Position = UDim2.new(1, -32, 0, 5)
 closeButton.BackgroundColor3 = COLORS.Darker
 closeButton.BackgroundTransparency = 0.5
-closeButton.Text = "✕"
+closeButton.Text = "X"
 closeButton.TextColor3 = COLORS.TextDim
-closeButton.TextSize = 14
+closeButton.TextSize = 12
 closeButton.Font = Enum.Font.GothamBold
 closeButton.BorderSizePixel = 0
 closeButton.ZIndex = 1006
@@ -367,183 +366,6 @@ local function createToggle(parent, labelText, optionName)
 end
 
 -- ============================================
---   СОЗДАНИЕ TOGGLE ДЛЯ БАФФА
--- ============================================
-local function createBoostToggle(parent, labelText)
-	local container = Instance.new("Frame")
-	container.Size = UDim2.new(1, 0, 0, 30)
-	container.BackgroundTransparency = 1
-	container.Parent = parent
-	
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -50, 1, 0)
-	label.BackgroundTransparency = 1
-	label.Text = labelText
-	label.TextColor3 = COLORS.Text
-	label.TextSize = 13
-	label.Font = Enum.Font.Gotham
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.Parent = container
-	
-	local toggleBtn = Instance.new("TextButton")
-	toggleBtn.Size = UDim2.new(0, 40, 0, 22)
-	toggleBtn.Position = UDim2.new(1, -45, 0.5, -11)
-	toggleBtn.BackgroundColor3 = COLORS.ToggleOff
-	toggleBtn.Text = ""
-	toggleBtn.BorderSizePixel = 0
-	toggleBtn.Parent = container
-	
-	local toggleCorner = Instance.new("UICorner")
-	toggleCorner.CornerRadius = UDim.new(0, 11)
-	toggleCorner.Parent = toggleBtn
-	
-	local toggleDot = Instance.new("Frame")
-	toggleDot.Size = UDim2.new(0, 16, 0, 16)
-	toggleDot.Position = UDim2.new(0, 3, 0.5, -8)
-	toggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-	toggleDot.BorderSizePixel = 0
-	toggleDot.Parent = toggleBtn
-	
-	local dotCorner = Instance.new("UICorner")
-	dotCorner.CornerRadius = UDim.new(0, 8)
-	dotCorner.Parent = toggleDot
-	
-	local isOn = false
-	
-	local function updateToggle(state)
-		isOn = state
-		if isOn then
-			toggleBtn.BackgroundColor3 = COLORS.ToggleOn
-			toggleDot.Position = UDim2.new(0, 21, 0.5, -8)
-			toggleDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		else
-			toggleBtn.BackgroundColor3 = COLORS.ToggleOff
-			toggleDot.Position = UDim2.new(0, 3, 0.5, -8)
-			toggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-		end
-	end
-	
-	toggleBtn.MouseButton1Click:Connect(function()
-		local newState = not isOn
-		updateToggle(newState)
-		
-		if _G.SetGeneratorBoostEnabled then
-			_G.SetGeneratorBoostEnabled(newState)
-		end
-	end)
-	
-	-- Загружаем состояние
-	task.wait(0.1)
-	if _G.GetGeneratorBoostEnabled then
-		local state = _G.GetGeneratorBoostEnabled()
-		if state ~= nil then
-			updateToggle(state)
-		end
-	end
-	
-	return updateToggle
-end
-
--- ============================================
---   СОЗДАНИЕ ПОЛЯ ВВОДА
--- ============================================
-local function createInput(parent, labelText, getter, setter)
-	local container = Instance.new("Frame")
-	container.Size = UDim2.new(1, 0, 0, 40)
-	container.BackgroundTransparency = 1
-	container.Parent = parent
-	
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -100, 0, 20)
-	label.BackgroundTransparency = 1
-	label.Text = labelText
-	label.TextColor3 = COLORS.Text
-	label.TextSize = 13
-	label.Font = Enum.Font.Gotham
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.Parent = container
-	
-	local inputBox = Instance.new("TextBox")
-	inputBox.Size = UDim2.new(0, 80, 0, 28)
-	inputBox.Position = UDim2.new(1, -80, 0, 0)
-	inputBox.BackgroundColor3 = COLORS.InputBg
-	inputBox.BorderSizePixel = 0
-	inputBox.Text = "50"
-	inputBox.TextColor3 = COLORS.Text
-	inputBox.TextSize = 13
-	inputBox.Font = Enum.Font.GothamBold
-	inputBox.TextXAlignment = Enum.TextXAlignment.Center
-	inputBox.PlaceholderText = "0-100"
-	inputBox.Parent = container
-	
-	local inputCorner = Instance.new("UICorner")
-	inputCorner.CornerRadius = UDim.new(0, 6)
-	inputCorner.Parent = inputBox
-	
-	local suffixLabel = Instance.new("TextLabel")
-	suffixLabel.Size = UDim2.new(0, 15, 0, 20)
-	suffixLabel.Position = UDim2.new(1, 0, 0, 0)
-	suffixLabel.BackgroundTransparency = 1
-	suffixLabel.Text = "%"
-	suffixLabel.TextColor3 = COLORS.Accent
-	suffixLabel.TextSize = 13
-	suffixLabel.Font = Enum.Font.GothamBold
-	suffixLabel.TextXAlignment = Enum.TextXAlignment.Left
-	suffixLabel.Parent = container
-	
-	-- Загружаем начальное значение
-	task.wait(0.1)
-	if getter then
-		local initialValue = getter()
-		if initialValue ~= nil then
-			inputBox.Text = tostring(math.floor(initialValue))
-		end
-	end
-	
-	inputBox.FocusLost:Connect(function(enterPressed)
-		local num = tonumber(inputBox.Text)
-		if num then
-			num = math.clamp(math.floor(num), 0, 100)
-			inputBox.Text = tostring(num)
-			if setter then
-				setter(num)
-			end
-		else
-			-- Если введено не число, возвращаем последнее валидное значение
-			if getter then
-				local currentValue = getter()
-				if currentValue ~= nil then
-					inputBox.Text = tostring(math.floor(currentValue))
-				else
-					inputBox.Text = "50"
-				end
-			end
-		end
-	end)
-	
-	-- Обновляем значение при изменении через другие методы
-	local updateConnection
-	updateConnection = game:GetService("RunService").Heartbeat:Connect(function()
-		if not container.Parent then
-			if updateConnection then updateConnection:Disconnect() end
-			return
-		end
-		
-		if getter then
-			local currentValue = getter()
-			if currentValue ~= nil then
-				local currentText = tonumber(inputBox.Text)
-				if currentText ~= currentValue then
-					inputBox.Text = tostring(math.floor(currentValue))
-				end
-			end
-		end
-	end)
-	
-	return inputBox
-end
-
--- ============================================
 --   СОЗДАНИЕ ВСЕХ ВКЛАДОК
 -- ============================================
 createTab("Visual", "👁️")
@@ -555,7 +377,7 @@ createTab("Misc", "⚙")
 createTab("Settings", "🔧")
 
 -- ============================================
---   НАПОЛНЕНИЕ ВКЛАДКИ VISUAL
+--   НАПОЛНЕНИЕ ВКЛАДКИ VISUAL (ВСЕ КНОПКИ ESP)
 -- ============================================
 local visualTab = tabs["Visual"]
 visualTab.Visible = true
@@ -631,8 +453,21 @@ miscSpacing2.Parent = visualTab
 createToggle(visualTab, "Full Bright", "FullBright")
 
 -- ============================================
---   НАПОЛНЕНИЕ ВКЛАДКИ MODIFICATION
+--   ДРУГИЕ ВКЛАДКИ (ПУСТЫЕ, ДЛЯ БУДУЩИХ ФУНКЦИЙ)
 -- ============================================
+-- Movement
+local movementTab = tabs["Movement"]
+local movLabel = Instance.new("TextLabel")
+movLabel.Size = UDim2.new(1, 0, 0, 30)
+movLabel.BackgroundTransparency = 1
+movLabel.Text = "🚀 Movement options coming soon..."
+movLabel.TextColor3 = COLORS.TextDim
+movLabel.TextSize = 14
+movLabel.Font = Enum.Font.Gotham
+movLabel.TextXAlignment = Enum.TextXAlignment.Center
+movLabel.Parent = movementTab
+
+-- Modification
 local modTab = tabs["Modification"]
 
 local modLayout = Instance.new("UIListLayout")
@@ -650,65 +485,6 @@ modPadding.Parent = modTab
 modTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
 modTab.CanvasSize = UDim2.new(0, 0, 0, 0)
 
--- ============================================
---   РАЗДЕЛ: GENERATOR BOOST
--- ============================================
-local boostTitle = Instance.new("TextLabel")
-boostTitle.Size = UDim2.new(1, 0, 0, 25)
-boostTitle.BackgroundTransparency = 1
-boostTitle.Text = "▶ Generator Boost"
-boostTitle.TextColor3 = COLORS.Accent
-boostTitle.TextSize = 14
-boostTitle.Font = Enum.Font.GothamBold
-boostTitle.TextXAlignment = Enum.TextXAlignment.Left
-boostTitle.Parent = modTab
-
-local boostSpacing = Instance.new("Frame")
-boostSpacing.Size = UDim2.new(1, 0, 0, 5)
-boostSpacing.BackgroundTransparency = 1
-boostSpacing.Parent = modTab
-
--- Toggle для включения баффа
-local boostToggle = createBoostToggle(modTab, "Enable Generator Boost")
-
-local boostSpacing2 = Instance.new("Frame")
-boostSpacing2.Size = UDim2.new(1, 0, 0, 5)
-boostSpacing2.BackgroundTransparency = 1
-boostSpacing2.Parent = modTab
-
--- Поле ввода для процента баффа
-local boostInput = createInput(
-	modTab,
-	"Boost Speed",
-	_G.GetGeneratorBoostPercent,
-	_G.SetGeneratorBoostPercent
-)
-
-local boostInfoLabel = Instance.new("TextLabel")
-boostInfoLabel.Size = UDim2.new(1, 0, 0, 20)
-boostInfoLabel.BackgroundTransparency = 1
-boostInfoLabel.Text = "0% = no boost | 50% = 1.5x | 100% = 2x speed"
-boostInfoLabel.TextColor3 = COLORS.TextDim
-boostInfoLabel.TextSize = 10
-boostInfoLabel.Font = Enum.Font.Gotham
-boostInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
-boostInfoLabel.Parent = modTab
-
--- Разделитель
-local modDivider = Instance.new("Frame")
-modDivider.Size = UDim2.new(1, 0, 0, 1)
-modDivider.BackgroundColor3 = COLORS.Darker
-modDivider.BackgroundTransparency = 0.5
-modDivider.Parent = modTab
-
-local modSpacing = Instance.new("Frame")
-modSpacing.Size = UDim2.new(1, 0, 0, 10)
-modSpacing.BackgroundTransparency = 1
-modSpacing.Parent = modTab
-
--- ============================================
---   РАЗДЕЛ: ANIMATIONS
--- ============================================
 local animTitle = Instance.new("TextLabel")
 animTitle.Size = UDim2.new(1, 0, 0, 25)
 animTitle.BackgroundTransparency = 1
@@ -856,21 +632,6 @@ player.CharacterAdded:Connect(function()
     stopMenuAnimation()
 end)
 
--- ============================================
---   ДРУГИЕ ВКЛАДКИ (ПУСТЫЕ)
--- ============================================
--- Movement
-local movementTab = tabs["Movement"]
-local movLabel = Instance.new("TextLabel")
-movLabel.Size = UDim2.new(1, 0, 0, 30)
-movLabel.BackgroundTransparency = 1
-movLabel.Text = "🚀 Movement options coming soon..."
-movLabel.TextColor3 = COLORS.TextDim
-movLabel.TextSize = 14
-movLabel.Font = Enum.Font.Gotham
-movLabel.TextXAlignment = Enum.TextXAlignment.Center
-movLabel.Parent = movementTab
-
 -- Combat
 local combatTab = tabs["Combat"]
 local combatLabel = Instance.new("TextLabel")
@@ -941,4 +702,3 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 print("[SOEKKI] UI loaded! Press RightShift to toggle.")
-print("[SOEKKI] Generator boost controls added to Modification tab!")
