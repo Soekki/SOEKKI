@@ -61,18 +61,7 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 12)
 corner.Parent = mainFrame
 
-local accentBorder = Instance.new("Frame")
-accentBorder.Size = UDim2.new(1, 0, 1, 0)
-accentBorder.BackgroundColor3 = COLORS.Accent
-accentBorder.BackgroundTransparency = 0.85
-accentBorder.BorderSizePixel = 2
-accentBorder.BorderColor3 = COLORS.Accent
-accentBorder.ZIndex = 10002
-accentBorder.Parent = mainFrame
 
-local accentCorner = Instance.new("UICorner")
-accentCorner.CornerRadius = UDim.new(0, 12)
-accentCorner.Parent = accentBorder
 
 -- ============================================
 --   ЗАГОЛОВОК
