@@ -572,15 +572,55 @@ local function GetOriginalSource(powersScript)
     return OriginalPowersSource[powersScript]
 end
 
+local function RestartPowers(powersScript, source)
+    if not powersScript then
+        return false, "Powers script not found"
+    end
+
+    -- Powers is a running LocalScript. Changing Source alone does not
+    -- restart its already-running thread, so disable it first, replace
+    -- the source, then enable it again.
+    local disabled, disableErr = pcall(function()
+        powersScript.Enabled = false
+    end)
+
+    if not disabled then
+        return false, "Powers cannot be disabled: " .. tostring(disableErr)
+    end
+
+    task.wait()
+
+    local sourceOk, sourceErr = pcall(function()
+        powersScript.Source = source
+    end)
+
+    if not sourceOk then
+        pcall(function()
+            powersScript.Enabled = true
+        end)
+        return false, "Powers.Source cannot be changed: " .. tostring(sourceErr)
+    end
+
+    local enabled, enableErr = pcall(function()
+        powersScript.Enabled = true
+    end)
+
+    if not enabled then
+        return false, "Powers cannot be enabled: " .. tostring(enableErr)
+    end
+
+    -- Give the restarted LocalScript a frame to begin executing the new Source.
+    task.wait()
+    return true
+end
+
 local function RestorePowers(powersScript)
     local original = OriginalPowersSource[powersScript]
     if not original then
         return false
     end
 
-    local ok = pcall(function()
-        powersScript.Source = original
-    end)
+    local ok = RestartPowers(powersScript, original)
 
     if ok then
         LastAppliedSignature = nil
@@ -658,9 +698,9 @@ local function ApplyMaskSelection()
         return true, "already applied"
     end
 
-    local ok, err = pcall(function()
-        powersScript.Source = newSource
-    end)
+    -- The running Powers LocalScript keeps executing its old compiled code
+    -- after Source is changed. Restart it so the new mask table is actually used.
+    local ok, err = RestartPowers(powersScript, newSource)
 
     if not ok then
         return false, tostring(err)
