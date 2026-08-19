@@ -77,8 +77,7 @@ local function patchUI(source)
         changes += n
     end
 
-    -- 2) MainFrame is the background only.
-    -- Keep it below default-ZIndex descendants (buttons, labels, toggles, etc.).
+    -- 2) Keep MainFrame as the lowest background layer.
     newSource, n = source:gsub(
         'mainFrame%.ZIndex%s*=%s*%d+',
         'mainFrame.ZIndex = 0',
@@ -204,6 +203,21 @@ screenGui.Parent = __SOEKKI_GUI_PARENT
     else
         warn("[SOEKKI] UI robust patch made no source changes.")
     end
+
+    -- 3) Force all GUI descendants above the main background.
+    local zFix = [[
+mainFrame.ZIndex = 0
+for _, obj in ipairs(mainFrame:GetDescendants()) do
+    if obj:IsA("GuiObject") and obj.ZIndex < 1001 then
+        obj.ZIndex = 1001
+    end
+end
+]]
+    source = source:gsub(
+        'local corner = Instance.new%("UICorner"%)',
+        zFix .. '\\nlocal corner = Instance.new("UICorner")',
+        1
+    )
 
     return source
 end
