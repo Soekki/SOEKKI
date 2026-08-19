@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -494,6 +495,7 @@ local OriginalPowersSource = {}
 local LastMaskedState = nil
 local LastPowersScript = nil
 local LastAppliedSignature = nil
+local MaskRemoteHookInstalled = false
 
 local function IsMaskedKiller()
     local teamName = (LocalPlayer.Team and LocalPlayer.Team.Name:lower()) or ""
@@ -517,8 +519,6 @@ local function FindPowersScript()
         table.insert(candidates, LocalPlayer.Character)
     end
 
-    -- Обычно Character = workspace[Player.Name], но оставляем
-    -- fallback для случаев, когда Character ещё не установлен.
     local workspaceCharacter = workspace:FindFirstChild(LocalPlayer.Name)
     if workspaceCharacter and workspaceCharacter ~= LocalPlayer.Character then
         table.insert(candidates, workspaceCharacter)
@@ -546,120 +546,93 @@ local function GetSelectedMasks()
     return result
 end
 
-local function BuildMaskTable(maskList)
-    local quoted = {}
+local function ChooseSelectedMask()
+    local selectedMasks = GetSelectedMasks()
 
-    for _, maskName in ipairs(maskList) do
-        table.insert(quoted, string.format('%q', maskName))
+    if #selectedMasks == 0 then
+        return nil
     end
 
-    return "local t = { " .. table.concat(quoted, ", ") .. " }"
+    return selectedMasks[math.random(1, #selectedMasks)]
 end
 
-local function GetOriginalSource(powersScript)
-    if OriginalPowersSource[powersScript] == nil then
-        local ok, source = pcall(function()
-            return powersScript.Source
-        end)
-
-        if not ok or type(source) ~= "string" then
-            return nil
-        end
-
-        OriginalPowersSource[powersScript] = source
-    end
-
-    return OriginalPowersSource[powersScript]
-end
-
-local function RestartPowers(powersScript, source)
-    if not powersScript then
-        return false, "Powers script not found"
-    end
-
-    -- Powers is a running LocalScript. Changing Source alone does not
-    -- restart its already-running thread, so disable it first, replace
-    -- the source, then enable it again.
-    local disabled, disableErr = pcall(function()
-        powersScript.Enabled = false
-    end)
-
-    if not disabled then
-        return false, "Powers cannot be disabled: " .. tostring(disableErr)
-    end
-
-    task.wait()
-
-    local sourceOk, sourceErr = pcall(function()
-        powersScript.Source = source
-    end)
-
-    if not sourceOk then
-        pcall(function()
-            powersScript.Enabled = true
-        end)
-        return false, "Powers.Source cannot be changed: " .. tostring(sourceErr)
-    end
-
-    local enabled, enableErr = pcall(function()
-        powersScript.Enabled = true
-    end)
-
-    if not enabled then
-        return false, "Powers cannot be enabled: " .. tostring(enableErr)
-    end
-
-    -- Give the restarted LocalScript a frame to begin executing the new Source.
-    task.wait()
-    return true
-end
-
-local function RestorePowers(powersScript)
-    local original = OriginalPowersSource[powersScript]
-    if not original then
-        return false
-    end
-
-    local ok = RestartPowers(powersScript, original)
-
-    if ok then
-        LastAppliedSignature = nil
+-- Powers.Source возвращается пустым в текущем окружении, поэтому
+-- менять/перезапускать игровой Powers нельзя. Вместо этого перехватываем
+-- именно тот FireServer, которым оригинальный Powers отправляет выбранную
+-- маску на сервер.
+local function InstallMaskRemoteHook()
+    if MaskRemoteHookInstalled then
         return true
     end
 
-    return false
+    local okRemote, Activatepower = pcall(function()
+        return ReplicatedStorage
+            :WaitForChild("Remotes")
+            :WaitForChild("Killers")
+            :WaitForChild("Masked")
+            :WaitForChild("Activatepower")
+    end)
+
+    if not okRemote or not Activatepower then
+        warn("[MASK] Activatepower remote not found")
+        return false
+    end
+
+    if type(hookmetamethod) ~= "function" or type(getnamecallmethod) ~= "function" then
+        warn("[MASK] Executor does not provide hookmetamethod/getnamecallmethod")
+        return false
+    end
+
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+
+        if self == Activatepower and method == "FireServer" then
+            if IsMaskedKiller() then
+                local forcedMask = ChooseSelectedMask()
+
+                if forcedMask then
+                    print("[MASK] Forced mask -> " .. forcedMask)
+                    return oldNamecall(self, forcedMask)
+                end
+            end
+        end
+
+        return oldNamecall(self, ...)
+    end))
+
+    MaskRemoteHookInstalled = true
+
+    print("[MASK] Activatepower hook installed: " .. Activatepower:GetFullName())
+    return true
 end
 
 local function ApplyMaskSelection()
     local selectedMasks = GetSelectedMasks()
-    print('[MASK DEBUG] ===== START =====')
-    print('[MASK DEBUG] Selected: '..(#selectedMasks>0 and table.concat(selectedMasks, ', ') or '<NONE>'))
-    print('[MASK DEBUG] MaskedKiller: '..tostring(IsMaskedKiller()))
-    local powersScript = FindPowersScript()
-    if not powersScript then warn('[MASK DEBUG] Powers NOT FOUND'); return false, 'Powers script not found' end
-    print('[MASK DEBUG] Powers: '..powersScript:GetFullName())
-    if powersScript ~= LastPowersScript then print('[MASK DEBUG] NEW Powers INSTANCE'); LastPowersScript=powersScript; LastAppliedSignature=nil end
-    local originalSource = GetOriginalSource(powersScript)
-    if not originalSource then warn('[MASK DEBUG] Original Source unavailable'); return false, 'Powers.Source unavailable' end
-    local ok,currentSource=pcall(function() return powersScript.Source end)
-    if not ok or type(currentSource)~='string' then warn('[MASK DEBUG] Current Source unreadable'); return false,'Powers.Source unreadable' end
-    print('[MASK DEBUG] OriginalLen='..#originalSource..' CurrentLen='..#currentSource)
-    print('[MASK DEBUG] Current Alex='..tostring(currentSource:find('"Alex"',1,true)~=nil)..' Brandon='..tostring(currentSource:find('"Brandon"',1,true)~=nil)..' Cobra='..tostring(currentSource:find('"Cobra"',1,true)~=nil)..' Rabbit='..tostring(currentSource:find('"Rabbit"',1,true)~=nil)..' Richter='..tostring(currentSource:find('"Richter"',1,true)~=nil)..' Tony='..tostring(currentSource:find('"Tony"',1,true)~=nil))
-    if not IsMaskedKiller() or #selectedMasks==0 then print('[MASK DEBUG] No override applied'); return true, 'default/not masked' end
-    local replacement=BuildMaskTable(selectedMasks); print('[MASK DEBUG] Replacement: '..replacement)
-    local newSource,replacements=originalSource:gsub('local%s+t%s*=%s*{.-}',replacement,1)
-    print('[MASK DEBUG] Replacements='..tostring(replacements))
-    if replacements==0 then warn('[MASK DEBUG] local t NOT FOUND'); return false,'local t table not found' end
-    print('[MASK DEBUG] NewSource Alex='..tostring(newSource:find('"Alex"',1,true)~=nil)..' Brandon='..tostring(newSource:find('"Brandon"',1,true)~=nil)..' Cobra='..tostring(newSource:find('"Cobra"',1,true)~=nil)..' Rabbit='..tostring(newSource:find('"Rabbit"',1,true)~=nil)..' Richter='..tostring(newSource:find('"Richter"',1,true)~=nil)..' Tony='..tostring(newSource:find('"Tony"',1,true)~=nil))
-    if currentSource==newSource then print('[MASK DEBUG] Already applied'); return true,'already applied' end
-    print('[MASK DEBUG] Restarting...')
-    local restartOk,err=RestartPowers(powersScript,newSource)
-    print('[MASK DEBUG] Restart='..tostring(restartOk)..' err='..tostring(err))
-    task.wait(0.1)
-    local vok,vs=pcall(function() return powersScript.Source end)
-    if vok and type(vs)=='string' then print('[MASK DEBUG] VERIFY Alex='..tostring(vs:find('"Alex"',1,true)~=nil)..' Brandon='..tostring(vs:find('"Brandon"',1,true)~=nil)..' Cobra='..tostring(vs:find('"Cobra"',1,true)~=nil)..' Rabbit='..tostring(vs:find('"Rabbit"',1,true)~=nil)..' Richter='..tostring(vs:find('"Richter"',1,true)~=nil)..' Tony='..tostring(vs:find('"Tony"',1,true)~=nil)) end
-    print('[MASK DEBUG] ===== END =====')
-    return restartOk, restartOk and 'applied' or tostring(err)
+    local signature = table.concat(selectedMasks, "|")
+
+    LastMaskedState = IsMaskedKiller()
+
+    -- Сам Powers не трогаем: Source у него читается пустым.
+    -- Управление происходит на уровне Activatepower:FireServer().
+    if not MaskRemoteHookInstalled then
+        InstallMaskRemoteHook()
+    end
+
+    if #selectedMasks == 0 then
+        if LastAppliedSignature ~= nil then
+            print("[MASK] Selection cleared -> original game behavior")
+        end
+        LastAppliedSignature = nil
+        return true, "default masks"
+    end
+
+    if LastAppliedSignature ~= signature then
+        print("[MASK] Selected: " .. table.concat(selectedMasks, ", "))
+        LastAppliedSignature = signature
+    end
+
+    return true, "remote hook active"
 end
 
 local function SetMaskState(maskName, state)
@@ -840,6 +813,8 @@ end)
 
 SetupGui()
 RefreshESP()
+InstallMaskRemoteHook()
+ApplyMaskSelection()
 
 -- Регистрируем в глобальном пространстве
 _G.ESPModule = module
