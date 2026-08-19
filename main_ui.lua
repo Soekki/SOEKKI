@@ -54,7 +54,7 @@ mainFrame.BackgroundColor3 = COLORS.Background
 mainFrame.BackgroundTransparency = 0.05
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
-mainFrame.ZIndex = 9999
+mainFrame.ZIndex = 1000
 mainFrame.Parent = screenGui
 
 local corner = Instance.new("UICorner")
