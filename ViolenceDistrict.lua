@@ -77,6 +77,19 @@ local function patchUI(source)
         changes += n
     end
 
+    -- 2) Keep MainFrame background below its UI content.
+    -- This is needed because the UI uses Global ZIndexBehavior.
+    newSource, n = source:gsub(
+        'mainFrame%.ZIndex%s*=%s*%d+',
+        'mainFrame.ZIndex = 1000',
+        1
+    )
+
+    if n > 0 then
+        source = newSource
+        changes += n
+    end
+
     -- 2) Max normal ScreenGui DisplayOrder.
     newSource, n = source:gsub(
         'screenGui%.DisplayOrder%s*=%s*%d+',
