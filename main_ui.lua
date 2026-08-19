@@ -1064,22 +1064,19 @@ ContextActionService:BindActionAtPriority(
 	Enum.KeyCode.RightShift
 )
 
--- ============================================
---   FINAL UI Z-ORDER FIX
--- ============================================
-mainFrame.ZIndex = 0
-
-for _, obj in ipairs(mainFrame:GetDescendants()) do
-    if obj:IsA("GuiObject") and obj.ZIndex < 1001 then
-        obj.ZIndex = 1001
-    end
-end
-
 -- Дополнительный биндинг через UserInputService
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.KeyCode == Enum.KeyCode.RightShift then
 		mainFrame.Visible = not mainFrame.Visible
 	end
 end)
+
+-- Final Z-order fix: mainFrame is only the background.
+mainFrame.ZIndex = 0
+for _, obj in ipairs(mainFrame:GetDescendants()) do
+    if obj:IsA("GuiObject") and obj.ZIndex < 1001 then
+        obj.ZIndex = 1001
+    end
+end
 
 print("[SOEKKI] UI loaded! Press RightShift to toggle (works everywhere).")
