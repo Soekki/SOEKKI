@@ -2,7 +2,49 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
+local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
+
+-- Player Speed Boost
+-- 0% = normal speed (x1.00), 100% = double speed (x2.00)
+local SpeedBoostPercent = 0
+local SpeedBoostMultiplier = 1
+
+local function applySpeedBoost()
+    local character = player.Character
+    if not character then
+        return
+    end
+
+    SpeedBoostMultiplier = 1 + (SpeedBoostPercent / 100)
+    character:SetAttribute("speedboost", SpeedBoostMultiplier)
+end
+
+local function setSpeedBoostPercent(percent)
+    percent = math.clamp(math.round(tonumber(percent) or 0), 0, 100)
+    SpeedBoostPercent = percent
+    SpeedBoostMultiplier = 1 + (percent / 100)
+    applySpeedBoost()
+end
+
+player.CharacterAdded:Connect(function(character)
+    character:WaitForChild("Humanoid", 5)
+    task.wait(0.1)
+    applySpeedBoost()
+end)
+
+-- SurvivorAnimationsController reads the "speedboost" character attribute
+-- every time it calculates the desired walk/run speed. Re-apply the selected
+-- value so the game's controller cannot silently reset it.
+RunService.Heartbeat:Connect(function()
+    local character = player.Character
+    if character and SpeedBoostPercent > 0 then
+        local current = character:GetAttribute("speedboost")
+        if current ~= SpeedBoostMultiplier then
+            character:SetAttribute("speedboost", SpeedBoostMultiplier)
+        end
+    end
+end)
 
 -- ============================================
 --   ЦВЕТА
@@ -372,6 +414,136 @@ local function createToggle(parent, labelText, optionName, customCallback)
 end
 
 -- ============================================
+--   СОЗДАНИЕ SLIDER
+-- ============================================
+local function createSlider(parent, labelText, minValue, maxValue, defaultValue, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 58)
+    container.BackgroundTransparency = 1
+    container.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -70, 0, 22)
+    label.Position = UDim2.new(0, 0, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = COLORS.Text
+    label.TextSize = 13
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(0, 65, 0, 22)
+    valueLabel.Position = UDim2.new(1, -65, 0, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.TextColor3 = COLORS.Accent
+    valueLabel.TextSize = 13
+    valueLabel.Font = Enum.Font.GothamBold
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    valueLabel.Parent = container
+
+    local track = Instance.new("Frame")
+    track.Size = UDim2.new(1, 0, 0, 6)
+    track.Position = UDim2.new(0, 0, 0, 34)
+    track.BackgroundColor3 = COLORS.ToggleOff
+    track.BorderSizePixel = 0
+    track.Parent = container
+
+    local trackCorner = Instance.new("UICorner")
+    trackCorner.CornerRadius = UDim.new(0, 3)
+    trackCorner.Parent = track
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new(0, 0, 1, 0)
+    fill.BackgroundColor3 = COLORS.Accent
+    fill.BorderSizePixel = 0
+    fill.Parent = track
+
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(0, 3)
+    fillCorner.Parent = fill
+
+    local knob = Instance.new("TextButton")
+    knob.Size = UDim2.new(0, 14, 0, 14)
+    knob.AnchorPoint = Vector2.new(0.5, 0.5)
+    knob.Position = UDim2.new(0, 0, 0.5, 0)
+    knob.BackgroundColor3 = COLORS.Text
+    knob.Text = ""
+    knob.BorderSizePixel = 0
+    knob.AutoButtonColor = false
+    knob.Parent = track
+
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(0, 7)
+    knobCorner.Parent = knob
+
+    local draggingSlider = false
+    local currentValue = math.clamp(defaultValue, minValue, maxValue)
+
+    local function setValue(value)
+        currentValue = math.clamp(math.round(value), minValue, maxValue)
+
+        local alpha = (currentValue - minValue) / (maxValue - minValue)
+        fill.Size = UDim2.new(alpha, 0, 1, 0)
+        knob.Position = UDim2.new(alpha, 0, 0.5, 0)
+        valueLabel.Text = string.format("%d%%", currentValue)
+
+        if callback then
+            callback(currentValue)
+        end
+    end
+
+    local function setFromInput(inputX)
+        local left = track.AbsolutePosition.X
+        local width = track.AbsoluteSize.X
+        if width <= 0 then
+            return
+        end
+
+        local alpha = math.clamp((inputX - left) / width, 0, 1)
+        setValue(minValue + (maxValue - minValue) * alpha)
+    end
+
+    track.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            draggingSlider = true
+            setFromInput(input.Position.X)
+        end
+    end)
+
+    knob.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            draggingSlider = true
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if not draggingSlider then
+            return
+        end
+
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+            setFromInput(input.Position.X)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            draggingSlider = false
+        end
+    end)
+
+    setValue(currentValue)
+
+    return setValue, container
+end
+
+-- ============================================
 --   СОЗДАНИЕ ВСЕХ ВКЛАДОК
 -- ============================================
 createTab("Visual", "👁️")
@@ -484,14 +656,13 @@ movTitle.Font = Enum.Font.GothamBold
 movTitle.TextXAlignment = Enum.TextXAlignment.Left
 movTitle.Parent = movementTab
 
-createToggle(movementTab, "Speed Boost", "SpeedBoost")
 createToggle(movementTab, "Infinite Lunge", "InfiniteLunge")
 createToggle(movementTab, "Noclip (Vaults/Pallets)", "NoclipVaultsPallets")
 createToggle(movementTab, "No Stun", "NoStun")
 createToggle(movementTab, "Auto Moonwalk", "AutoMoonwalk")
 
 -- ============================================
---   ВКЛАДКА MODIFICATION (АНИМАЦИИ + GENERATOR BOOST)
+--   ВКЛАДКА MODIFICATION (АНИМАЦИИ)
 -- ============================================
 local modTab = tabs["Modification"]
 
@@ -658,203 +829,6 @@ player.CharacterAdded:Connect(function()
     stopMenuAnimation()
 end)
 
--- Разделитель перед Generator Boost
-local genDivider = Instance.new("Frame")
-genDivider.Size = UDim2.new(1, 0, 0, 1)
-genDivider.BackgroundColor3 = COLORS.Darker
-genDivider.BackgroundTransparency = 0.5
-genDivider.Parent = modTab
-
-local genSpacing = Instance.new("Frame")
-genSpacing.Size = UDim2.new(1, 0, 0, 10)
-genSpacing.BackgroundTransparency = 1
-genSpacing.Parent = modTab
-
--- Заголовок Generator Boost
-local genBoostTitle = Instance.new("TextLabel")
-genBoostTitle.Size = UDim2.new(1, 0, 0, 25)
-genBoostTitle.BackgroundTransparency = 1
-genBoostTitle.Text = "▶ Generator Boost"
-genBoostTitle.TextColor3 = COLORS.Accent
-genBoostTitle.TextSize = 14
-genBoostTitle.Font = Enum.Font.GothamBold
-genBoostTitle.TextXAlignment = Enum.TextXAlignment.Left
-genBoostTitle.Parent = modTab
-
-local genBoostDesc = Instance.new("TextLabel")
-genBoostDesc.Size = UDim2.new(1, 0, 0, 20)
-genBoostDesc.BackgroundTransparency = 1
-genBoostDesc.Text = "Ускоряет ремонт генераторов через RepairEvent"
-genBoostDesc.TextColor3 = COLORS.TextDim
-genBoostDesc.TextSize = 11
-genBoostDesc.Font = Enum.Font.Gotham
-genBoostDesc.TextXAlignment = Enum.TextXAlignment.Left
-genBoostDesc.Parent = modTab
-
-local genBoostSpacing = Instance.new("Frame")
-genBoostSpacing.Size = UDim2.new(1, 0, 0, 5)
-genBoostSpacing.BackgroundTransparency = 1
-genBoostSpacing.Parent = modTab
-
--- Toggle для Generator Boost
-local genToggleContainer = Instance.new("Frame")
-genToggleContainer.Size = UDim2.new(1, 0, 0, 30)
-genToggleContainer.BackgroundTransparency = 1
-genToggleContainer.Parent = modTab
-
-local genToggleLabel = Instance.new("TextLabel")
-genToggleLabel.Size = UDim2.new(1, -50, 1, 0)
-genToggleLabel.BackgroundTransparency = 1
-genToggleLabel.Text = "Enable Repair Boost"
-genToggleLabel.TextColor3 = COLORS.Text
-genToggleLabel.TextSize = 13
-genToggleLabel.Font = Enum.Font.Gotham
-genToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-genToggleLabel.Parent = genToggleContainer
-
-local genToggleBtn = Instance.new("TextButton")
-genToggleBtn.Size = UDim2.new(0, 40, 0, 22)
-genToggleBtn.Position = UDim2.new(1, -45, 0.5, -11)
-genToggleBtn.BackgroundColor3 = COLORS.ToggleOff
-genToggleBtn.Text = ""
-genToggleBtn.BorderSizePixel = 0
-genToggleBtn.Parent = genToggleContainer
-
-local genToggleCorner = Instance.new("UICorner")
-genToggleCorner.CornerRadius = UDim.new(0, 11)
-genToggleCorner.Parent = genToggleBtn
-
-local genToggleDot = Instance.new("Frame")
-genToggleDot.Size = UDim2.new(0, 16, 0, 16)
-genToggleDot.Position = UDim2.new(0, 3, 0.5, -8)
-genToggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-genToggleDot.BorderSizePixel = 0
-genToggleDot.Parent = genToggleBtn
-
-local genDotCorner = Instance.new("UICorner")
-genDotCorner.CornerRadius = UDim.new(0, 8)
-genDotCorner.Parent = genToggleDot
-
-local genBoostEnabled = false
-
-local function updateGenToggle(state)
-    genBoostEnabled = state
-    if state then
-        genToggleBtn.BackgroundColor3 = COLORS.ToggleOn
-        genToggleDot.Position = UDim2.new(0, 21, 0.5, -8)
-        genToggleDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        genToggleLabel.Text = "Enable Repair Boost ✅"
-        genToggleLabel.TextColor3 = COLORS.Success
-    else
-        genToggleBtn.BackgroundColor3 = COLORS.ToggleOff
-        genToggleDot.Position = UDim2.new(0, 3, 0.5, -8)
-        genToggleDot.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-        genToggleLabel.Text = "Enable Repair Boost"
-        genToggleLabel.TextColor3 = COLORS.Text
-    end
-end
-
-genToggleBtn.MouseButton1Click:Connect(function()
-    local newState = not genBoostEnabled
-    updateGenToggle(newState)
-    
-    if _G.GeneratorBoost then
-        if newState then
-            _G.GeneratorBoost.Enabled = true
-            _G.GeneratorBoost:Toggle()
-            print("[UI] 🟢 Generator Boost ENABLED!")
-        else
-            _G.GeneratorBoost.Enabled = false
-            _G.GeneratorBoost:Toggle()
-            print("[UI] 🔴 Generator Boost DISABLED!")
-        end
-    else
-        warn("[UI] ❌ GeneratorBoost not loaded!")
-    end
-end)
-
--- Кнопка "Repair Nearest Generator"
-local repairNearestBtn = Instance.new("TextButton")
-repairNearestBtn.Size = UDim2.new(1, 0, 0, 30)
-repairNearestBtn.BackgroundColor3 = COLORS.Darker
-repairNearestBtn.BackgroundTransparency = 0.15
-repairNearestBtn.BorderSizePixel = 0
-repairNearestBtn.Text = "⚡ Repair Nearest Generator"
-repairNearestBtn.TextColor3 = COLORS.Text
-repairNearestBtn.TextSize = 13
-repairNearestBtn.Font = Enum.Font.GothamBold
-repairNearestBtn.TextXAlignment = Enum.TextXAlignment.Center
-repairNearestBtn.Parent = modTab
-
-local repairNearestCorner = Instance.new("UICorner")
-repairNearestCorner.CornerRadius = UDim.new(0, 6)
-repairNearestCorner.Parent = repairNearestBtn
-
-repairNearestBtn.MouseButton1Click:Connect(function()
-    if _G.GeneratorBoost then
-        local nearest, dist = _G.GeneratorBoost:GetNearestGenerator()
-        if nearest then
-            print("[UI] 🔧 Starting repair on nearest generator (distance: " .. tostring(dist) .. ")")
-            _G.GeneratorBoost:StartRepairOnTarget(nearest)
-        else
-            print("[UI] ⚠️ No generators found nearby!")
-        end
-    else
-        print("[UI] ❌ GeneratorBoost not loaded!")
-    end
-end)
-
--- Кнопка "Stop Repair"
-local stopRepairBtn = Instance.new("TextButton")
-stopRepairBtn.Size = UDim2.new(1, 0, 0, 30)
-stopRepairBtn.BackgroundColor3 = COLORS.ToggleOff
-stopRepairBtn.BackgroundTransparency = 0.2
-stopRepairBtn.BorderSizePixel = 0
-stopRepairBtn.Text = "⏹ Stop Repair"
-stopRepairBtn.TextColor3 = COLORS.Text
-stopRepairBtn.TextSize = 13
-stopRepairBtn.Font = Enum.Font.GothamBold
-stopRepairBtn.TextXAlignment = Enum.TextXAlignment.Center
-stopRepairBtn.Parent = modTab
-
-local stopRepairCorner = Instance.new("UICorner")
-stopRepairCorner.CornerRadius = UDim.new(0, 6)
-stopRepairCorner.Parent = stopRepairBtn
-
-stopRepairBtn.MouseButton1Click:Connect(function()
-    if _G.GeneratorBoost then
-        _G.GeneratorBoost:StopRepair()
-        print("[UI] ⏹ Repair stopped!")
-    end
-end)
-
--- Индикатор статуса
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, 0, 0, 20)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Status: Idle"
-statusLabel.TextColor3 = COLORS.TextDim
-statusLabel.TextSize = 11
-statusLabel.Font = Enum.Font.Gotham
-statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.Parent = modTab
-
-local function updateStatus()
-    if _G.GeneratorBoost and _G.GeneratorBoost.IsRepairing then
-        statusLabel.Text = "Status: ⚡ Repairing..."
-        statusLabel.TextColor3 = COLORS.Success
-    else
-        statusLabel.Text = "Status: Idle"
-        statusLabel.TextColor3 = COLORS.TextDim
-    end
-end
-
-game:GetService("RunService").Heartbeat:Connect(function()
-    if mainFrame.Visible then
-        updateStatus()
-    end
-end)
-
 -- ============================================
 --   ВКЛАДКА COMBAT
 -- ============================================
@@ -921,6 +895,17 @@ playerTitle.TextSize = 14
 playerTitle.Font = Enum.Font.GothamBold
 playerTitle.TextXAlignment = Enum.TextXAlignment.Left
 playerTitle.Parent = playerTab
+
+createSlider(
+    playerTab,
+    "Speed Boost",
+    0,
+    100,
+    0,
+    function(percent)
+        setSpeedBoostPercent(percent)
+    end
+)
 
 createToggle(playerTab, "Infinite Flashlight", "InfiniteFlashlight")
 createToggle(playerTab, "Rainbow Character", "RainbowCharacter")
@@ -1010,9 +995,6 @@ unloadCorner.Parent = unloadBtn
 
 unloadBtn.MouseButton1Click:Connect(function()
     print("[UI] ⚠ Unloading...")
-    if _G.GeneratorBoost then
-        _G.GeneratorBoost:StopRepair()
-    end
     screenGui:Destroy()
     print("[UI] ✅ Unloaded!")
 end)

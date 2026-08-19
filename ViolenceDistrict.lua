@@ -39,23 +39,6 @@ end
 -- Config
 runModule("config", loadModule(BASE_URL .. "config.lua"))
 
--- Generator boost is loaded, but NOT auto-enabled.
-do
-    local boostCode = loadModule(BASE_URL .. "generator_boost.lua")
-    local boostFn, boostErr = loadstring(boostCode)
-
-    if not boostFn then
-        warn("[SOEKKI] Compile error in generator_boost: " .. tostring(boostErr))
-    else
-        local ok, err = pcall(boostFn)
-        if ok then
-            print("[SOEKKI] generator_boost loaded!")
-        else
-            warn("[SOEKKI] generator_boost runtime error: " .. tostring(err))
-        end
-    end
-end
-
 -- Main functions
 runModule("main_functions", loadModule(BASE_URL .. "main_functions.lua"))
 
