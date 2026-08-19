@@ -77,11 +77,11 @@ local function patchUI(source)
         changes += n
     end
 
-    -- 2) Keep MainFrame background below its UI content.
-    -- This is needed because the UI uses Global ZIndexBehavior.
+    -- 2) MainFrame is the background only.
+    -- Keep it below default-ZIndex descendants (buttons, labels, toggles, etc.).
     newSource, n = source:gsub(
         'mainFrame%.ZIndex%s*=%s*%d+',
-        'mainFrame.ZIndex = 1000',
+        'mainFrame.ZIndex = 0',
         1
     )
 
