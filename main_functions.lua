@@ -631,85 +631,35 @@ local function RestorePowers(powersScript)
 end
 
 local function ApplyMaskSelection()
-    local powersScript = FindPowersScript()
-
-    -- Если Powers пересоздался, это новый объект и у него должен
-    -- появиться собственный оригинальный Source.
-    if powersScript ~= LastPowersScript then
-        LastPowersScript = powersScript
-        LastAppliedSignature = nil
-    end
-
-    if not powersScript then
-        return false, "Powers script not found"
-    end
-
-    local originalSource = GetOriginalSource(powersScript)
-    if not originalSource then
-        return false, "Powers.Source is unavailable"
-    end
-
-    local currentSourceOk, currentSource = pcall(function()
-        return powersScript.Source
-    end)
-
-    if not currentSourceOk or type(currentSource) ~= "string" then
-        return false, "Powers.Source cannot be read"
-    end
-
-    local maskedKiller = IsMaskedKiller()
-    LastMaskedState = maskedKiller
-
-    -- Не Masked -> ничего не меняем, а если ранее меняли, возвращаем оригинал.
-    if not maskedKiller then
-        if currentSource ~= originalSource then
-            RestorePowers(powersScript)
-        end
-        return true, "not masked"
-    end
-
     local selectedMasks = GetSelectedMasks()
-
-    -- Все выключены -> стандартная логика игры.
-    if #selectedMasks == 0 then
-        if currentSource ~= originalSource then
-            RestorePowers(powersScript)
-        end
-        return true, "default masks"
-    end
-
-    local signature = table.concat(selectedMasks, "|")
-    local replacement = BuildMaskTable(selectedMasks)
-
-    -- Строим ожидаемый Source каждый раз, чтобы если сама игра
-    -- перезаписала Powers, наша настройка восстановилась.
-    local newSource, replacements = originalSource:gsub(
-        "local%s+t%s*=%s*{.-}",
-        replacement,
-        1
-    )
-
-    if replacements == 0 then
-        return false, "local t table not found in Powers.Source"
-    end
-
-    if currentSource == newSource then
-        LastAppliedSignature = signature
-        return true, "already applied"
-    end
-
-    -- The running Powers LocalScript keeps executing its old compiled code
-    -- after Source is changed. Restart it so the new mask table is actually used.
-    local ok, err = RestartPowers(powersScript, newSource)
-
-    if not ok then
-        return false, tostring(err)
-    end
-
-    LastAppliedSignature = signature
-
-    print("[SOEKKI][MASKS] Active: " .. table.concat(selectedMasks, ", "))
-    return true, "applied"
+    print('[MASK DEBUG] ===== START =====')
+    print('[MASK DEBUG] Selected: '..(#selectedMasks>0 and table.concat(selectedMasks, ', ') or '<NONE>'))
+    print('[MASK DEBUG] MaskedKiller: '..tostring(IsMaskedKiller()))
+    local powersScript = FindPowersScript()
+    if not powersScript then warn('[MASK DEBUG] Powers NOT FOUND'); return false, 'Powers script not found' end
+    print('[MASK DEBUG] Powers: '..powersScript:GetFullName())
+    if powersScript ~= LastPowersScript then print('[MASK DEBUG] NEW Powers INSTANCE'); LastPowersScript=powersScript; LastAppliedSignature=nil end
+    local originalSource = GetOriginalSource(powersScript)
+    if not originalSource then warn('[MASK DEBUG] Original Source unavailable'); return false, 'Powers.Source unavailable' end
+    local ok,currentSource=pcall(function() return powersScript.Source end)
+    if not ok or type(currentSource)~='string' then warn('[MASK DEBUG] Current Source unreadable'); return false,'Powers.Source unreadable' end
+    print('[MASK DEBUG] OriginalLen='..#originalSource..' CurrentLen='..#currentSource)
+    print('[MASK DEBUG] Current Alex='..tostring(currentSource:find('"Alex"',1,true)~=nil)..' Brandon='..tostring(currentSource:find('"Brandon"',1,true)~=nil)..' Cobra='..tostring(currentSource:find('"Cobra"',1,true)~=nil)..' Rabbit='..tostring(currentSource:find('"Rabbit"',1,true)~=nil)..' Richter='..tostring(currentSource:find('"Richter"',1,true)~=nil)..' Tony='..tostring(currentSource:find('"Tony"',1,true)~=nil))
+    if not IsMaskedKiller() or #selectedMasks==0 then print('[MASK DEBUG] No override applied'); return true, 'default/not masked' end
+    local replacement=BuildMaskTable(selectedMasks); print('[MASK DEBUG] Replacement: '..replacement)
+    local newSource,replacements=originalSource:gsub('local%s+t%s*=%s*{.-}',replacement,1)
+    print('[MASK DEBUG] Replacements='..tostring(replacements))
+    if replacements==0 then warn('[MASK DEBUG] local t NOT FOUND'); return false,'local t table not found' end
+    print('[MASK DEBUG] NewSource Alex='..tostring(newSource:find('"Alex"',1,true)~=nil)..' Brandon='..tostring(newSource:find('"Brandon"',1,true)~=nil)..' Cobra='..tostring(newSource:find('"Cobra"',1,true)~=nil)..' Rabbit='..tostring(newSource:find('"Rabbit"',1,true)~=nil)..' Richter='..tostring(newSource:find('"Richter"',1,true)~=nil)..' Tony='..tostring(newSource:find('"Tony"',1,true)~=nil))
+    if currentSource==newSource then print('[MASK DEBUG] Already applied'); return true,'already applied' end
+    print('[MASK DEBUG] Restarting...')
+    local restartOk,err=RestartPowers(powersScript,newSource)
+    print('[MASK DEBUG] Restart='..tostring(restartOk)..' err='..tostring(err))
+    task.wait(0.1)
+    local vok,vs=pcall(function() return powersScript.Source end)
+    if vok and type(vs)=='string' then print('[MASK DEBUG] VERIFY Alex='..tostring(vs:find('"Alex"',1,true)~=nil)..' Brandon='..tostring(vs:find('"Brandon"',1,true)~=nil)..' Cobra='..tostring(vs:find('"Cobra"',1,true)~=nil)..' Rabbit='..tostring(vs:find('"Rabbit"',1,true)~=nil)..' Richter='..tostring(vs:find('"Richter"',1,true)~=nil)..' Tony='..tostring(vs:find('"Tony"',1,true)~=nil)) end
+    print('[MASK DEBUG] ===== END =====')
+    return restartOk, restartOk and 'applied' or tostring(err)
 end
 
 local function SetMaskState(maskName, state)
