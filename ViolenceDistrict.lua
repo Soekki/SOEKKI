@@ -77,13 +77,25 @@ local function patchUI(source)
         changes += n
     end
 
-    -- 2) Keep MainFrame as the lowest background layer.
+    -- 2) Keep MainFrame background below all page controls.
     newSource, n = source:gsub(
         'mainFrame%.ZIndex%s*=%s*%d+',
         'mainFrame.ZIndex = 0',
         1
     )
+    if n > 0 then
+        source = newSource
+        changes += n
+    end
 
+    -- 3) Disable the old full-size accent overlay.
+    -- We detach it instead of injecting/removing multiline Lua, so the
+    -- patched source remains valid Lua.
+    newSource, n = source:gsub(
+        'accentBorder%.Parent%s*=%s*mainFrame',
+        'accentBorder.Parent = nil',
+        1
+    )
     if n > 0 then
         source = newSource
         changes += n
