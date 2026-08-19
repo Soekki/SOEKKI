@@ -38,7 +38,6 @@ local Config = {
 }
 
 local MaskNames = {
-    ["Richard"] = "Rooster",
     ["Tony"] = "Tiger",
     ["Brandon"] = "Panther",
     ["Cobra"] = "Cobra",
@@ -48,7 +47,6 @@ local MaskNames = {
 }
 
 local MaskColors = {
-    ["Richard"] = Color3.fromRGB(255, 0, 0),
     ["Tony"] = Color3.fromRGB(255, 255, 0),
     ["Brandon"] = Color3.fromRGB(160, 32, 240),
     ["Cobra"] = Color3.fromRGB(0, 255, 0),
@@ -469,6 +467,238 @@ local function RefreshESP()
 end
 
 -- ============================================
+--   MASKED KILLER - ВЫБОР МАСОК
+-- ============================================
+-- Управление масками вынесено сюда, чтобы UI был только интерфейсом.
+-- Поддерживаются: Alex, Brandon, Cobra, Rabbit, Richter, Tony.
+
+local MASK_OPTIONS = {
+    "Alex",
+    "Brandon",
+    "Cobra",
+    "Rabbit",
+    "Richter",
+    "Tony"
+}
+
+local MaskConfig = {
+    Alex = false,
+    Brandon = false,
+    Cobra = false,
+    Rabbit = false,
+    Richter = false,
+    Tony = false
+}
+
+local OriginalPowersSource = {}
+local LastMaskedState = nil
+local LastPowersScript = nil
+local LastAppliedSignature = nil
+
+local function IsMaskedKiller()
+    local teamName = (LocalPlayer.Team and LocalPlayer.Team.Name:lower()) or ""
+
+    if not teamName:find("killer", 1, true) then
+        return false
+    end
+
+    local selectedKiller = GetGameValue(LocalPlayer, "SelectedKiller")
+    if selectedKiller == nil then
+        return false
+    end
+
+    return tostring(selectedKiller):lower():find("masked", 1, true) ~= nil
+end
+
+local function FindPowersScript()
+    local candidates = {}
+
+    if LocalPlayer.Character then
+        table.insert(candidates, LocalPlayer.Character)
+    end
+
+    -- Обычно Character = workspace[Player.Name], но оставляем
+    -- fallback для случаев, когда Character ещё не установлен.
+    local workspaceCharacter = workspace:FindFirstChild(LocalPlayer.Name)
+    if workspaceCharacter and workspaceCharacter ~= LocalPlayer.Character then
+        table.insert(candidates, workspaceCharacter)
+    end
+
+    for _, root in ipairs(candidates) do
+        local powers = root:FindFirstChild("Powers", true)
+        if powers and powers:IsA("LuaSourceContainer") then
+            return powers
+        end
+    end
+
+    return nil
+end
+
+local function GetSelectedMasks()
+    local result = {}
+
+    for _, maskName in ipairs(MASK_OPTIONS) do
+        if MaskConfig[maskName] then
+            table.insert(result, maskName)
+        end
+    end
+
+    return result
+end
+
+local function BuildMaskTable(maskList)
+    local quoted = {}
+
+    for _, maskName in ipairs(maskList) do
+        table.insert(quoted, string.format('%q', maskName))
+    end
+
+    return "local t = { " .. table.concat(quoted, ", ") .. " }"
+end
+
+local function GetOriginalSource(powersScript)
+    if OriginalPowersSource[powersScript] == nil then
+        local ok, source = pcall(function()
+            return powersScript.Source
+        end)
+
+        if not ok or type(source) ~= "string" then
+            return nil
+        end
+
+        OriginalPowersSource[powersScript] = source
+    end
+
+    return OriginalPowersSource[powersScript]
+end
+
+local function RestorePowers(powersScript)
+    local original = OriginalPowersSource[powersScript]
+    if not original then
+        return false
+    end
+
+    local ok = pcall(function()
+        powersScript.Source = original
+    end)
+
+    if ok then
+        LastAppliedSignature = nil
+        return true
+    end
+
+    return false
+end
+
+local function ApplyMaskSelection()
+    local powersScript = FindPowersScript()
+
+    -- Если Powers пересоздался, это новый объект и у него должен
+    -- появиться собственный оригинальный Source.
+    if powersScript ~= LastPowersScript then
+        LastPowersScript = powersScript
+        LastAppliedSignature = nil
+    end
+
+    if not powersScript then
+        return false, "Powers script not found"
+    end
+
+    local originalSource = GetOriginalSource(powersScript)
+    if not originalSource then
+        return false, "Powers.Source is unavailable"
+    end
+
+    local currentSourceOk, currentSource = pcall(function()
+        return powersScript.Source
+    end)
+
+    if not currentSourceOk or type(currentSource) ~= "string" then
+        return false, "Powers.Source cannot be read"
+    end
+
+    local maskedKiller = IsMaskedKiller()
+    LastMaskedState = maskedKiller
+
+    -- Не Masked -> ничего не меняем, а если ранее меняли, возвращаем оригинал.
+    if not maskedKiller then
+        if currentSource ~= originalSource then
+            RestorePowers(powersScript)
+        end
+        return true, "not masked"
+    end
+
+    local selectedMasks = GetSelectedMasks()
+
+    -- Все выключены -> стандартная логика игры.
+    if #selectedMasks == 0 then
+        if currentSource ~= originalSource then
+            RestorePowers(powersScript)
+        end
+        return true, "default masks"
+    end
+
+    local signature = table.concat(selectedMasks, "|")
+    local replacement = BuildMaskTable(selectedMasks)
+
+    -- Строим ожидаемый Source каждый раз, чтобы если сама игра
+    -- перезаписала Powers, наша настройка восстановилась.
+    local newSource, replacements = originalSource:gsub(
+        "local%s+t%s*=%s*{.-}",
+        replacement,
+        1
+    )
+
+    if replacements == 0 then
+        return false, "local t table not found in Powers.Source"
+    end
+
+    if currentSource == newSource then
+        LastAppliedSignature = signature
+        return true, "already applied"
+    end
+
+    local ok, err = pcall(function()
+        powersScript.Source = newSource
+    end)
+
+    if not ok then
+        return false, tostring(err)
+    end
+
+    LastAppliedSignature = signature
+
+    print("[SOEKKI][MASKS] Active: " .. table.concat(selectedMasks, ", "))
+    return true, "applied"
+end
+
+local function SetMaskState(maskName, state)
+    if MaskConfig[maskName] == nil then
+        return false
+    end
+
+    MaskConfig[maskName] = state == true
+    ApplyMaskSelection()
+    return MaskConfig[maskName]
+end
+
+local function GetMaskState(maskName)
+    return MaskConfig[maskName] == true
+end
+
+local function GetMaskOptions()
+    return MASK_OPTIONS
+end
+
+local function GetMaskConfig()
+    local copy = {}
+    for _, maskName in ipairs(MASK_OPTIONS) do
+        copy[maskName] = MaskConfig[maskName] == true
+    end
+    return copy
+end
+
+-- ============================================
 --   ЭКСПОРТ ФУНКЦИЙ
 -- ============================================
 local module = {}
@@ -487,6 +717,26 @@ function module.SetESPState(option, state)
     ESPConfig[option] = state
     RefreshESP()
     return ESPConfig[option]
+end
+
+function module.SetMaskState(maskName, state)
+    return SetMaskState(maskName, state)
+end
+
+function module.GetMaskState(maskName)
+    return GetMaskState(maskName)
+end
+
+function module.GetMaskConfig()
+    return GetMaskConfig()
+end
+
+function module.GetMaskOptions()
+    return GetMaskOptions()
+end
+
+function module.ApplyMaskSelection()
+    return ApplyMaskSelection()
 end
 
 local OriginalLighting = {
@@ -518,6 +768,9 @@ RunService.Heartbeat:Connect(function()
     local now = tick()
     if now - LastUpdateTick < 0.05 then return end
     LastUpdateTick = now
+
+    -- Проверяем раунд/Killer/Powers и применяем выбранные маски.
+    pcall(ApplyMaskSelection)
     
     if ESPConfig.FullBright then
         Lighting.Ambient = Color3.fromRGB(255, 255, 255)
@@ -602,6 +855,11 @@ RefreshESP()
 _G.ESPModule = module
 _G.ToggleESP = module.ToggleESP
 _G.GetESPState = module.GetESPState
+_G.SetMaskState = module.SetMaskState
+_G.GetMaskState = module.GetMaskState
+_G.GetMaskConfig = module.GetMaskConfig
+_G.GetMaskOptions = module.GetMaskOptions
+_G.ApplyMaskSelection = module.ApplyMaskSelection
 
 print("[SOEKKI] Functions loaded!")
 

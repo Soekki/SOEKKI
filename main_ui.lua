@@ -825,6 +825,59 @@ stopCorner.Parent = stopAnimationButton
 
 stopAnimationButton.MouseButton1Click:Connect(stopMenuAnimation)
 
+-- ============================================
+--   MASKED KILLER - ВЫБОР МАСОК
+-- ============================================
+local maskTitle = Instance.new("TextLabel")
+maskTitle.Size = UDim2.new(1, 0, 0, 25)
+maskTitle.BackgroundTransparency = 1
+maskTitle.Text = "▶ Masked Killer"
+maskTitle.TextColor3 = COLORS.Accent
+maskTitle.TextSize = 14
+maskTitle.Font = Enum.Font.GothamBold
+maskTitle.TextXAlignment = Enum.TextXAlignment.Left
+maskTitle.Parent = modTab
+
+local maskInfo = Instance.new("TextLabel")
+maskInfo.Size = UDim2.new(1, 0, 0, 36)
+maskInfo.BackgroundTransparency = 1
+maskInfo.Text = "Choose one or more masks. If several are enabled, the game randomly selects between them."
+maskInfo.TextColor3 = COLORS.TextDim
+maskInfo.TextSize = 11
+maskInfo.Font = Enum.Font.Gotham
+maskInfo.TextXAlignment = Enum.TextXAlignment.Left
+maskInfo.TextYAlignment = Enum.TextYAlignment.Top
+maskInfo.TextWrapped = true
+maskInfo.Parent = modTab
+
+local maskOptions = {
+    "Alex",
+    "Brandon",
+    "Cobra",
+    "Rabbit",
+    "Richter",
+    "Tony"
+}
+
+for _, maskName in ipairs(maskOptions) do
+    local updateToggle = createToggle(
+        modTab,
+        maskName,
+        "Mask_" .. maskName,
+        function(state)
+            if _G.SetMaskState then
+                _G.SetMaskState(maskName, state)
+            end
+        end
+    )
+
+    -- Восстанавливаем состояние, если меню было пересоздано.
+    if _G.GetMaskState then
+        local state = _G.GetMaskState(maskName)
+        updateToggle(state)
+    end
+end
+
 player.CharacterAdded:Connect(function()
     stopMenuAnimation()
 end)
